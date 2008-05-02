@@ -11,6 +11,17 @@
 # Pedro Melo <melo@simplicidade.org>
 #
 
+if [ -z "$@" ] ; then
+  cat <<USAGE
+Usage: x-notify cmd
+
+Executes 'cmd' and send a notification via Growl or libnotify
+when the command ends.
+
+USAGE
+  exit 1
+fi
+
 # Run the command, including arguments with spaces
 "$@"
 status=$?
