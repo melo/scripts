@@ -1,10 +1,14 @@
 #!/bin/sh
 #
-#  Runs script, and prints a notification with growl when it finishes
+#  Runs script, and prints a notification with growl
+#  or libnotify when it finishes
 #
 # Written sometime in 2006, posted 2007/08
+# Part of Susie since May 2008.
 #
 # With Tips from Ranger Rick, Tim Bunce and Ruben Fonseca
+#
+# Pedro Melo <melo@simplicidade.org>
 #
 
 # Run the command, including arguments with spaces
