@@ -12,6 +12,13 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
+
+my $help;
+my $ok = GetOptions("help|?" => \$help);
+
+usage() if !$ok || $help;
+
 require_module('Lingua::Bork', qw(bork));
 
 print bork($_) while (<>);
@@ -31,3 +38,17 @@ sub require_module {
   }
   $module->import(@_);
 }
+
+sub usage {
+  print STDERR <<USAGE;
+Usage: x-bork-bork-bork [--help] [-?] [input files]
+
+Reads the input files, translates them into Bork, Bork, Bork, and sends
+the result to stdout.
+
+If no input files are given, it will read from stdin.
+
+USAGE
+  exit(1);
+}
+
