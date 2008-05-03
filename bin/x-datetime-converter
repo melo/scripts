@@ -1,7 +1,9 @@
 #!/usr/bin/perl -w
 
 use strict;
-use DateTime;
+use warnings;
+
+require_module('DateTime');
 
 # Format classes to use for display
 my @formats = qw( DateParse MySQL HTTP Mail RSS );
@@ -11,9 +13,8 @@ my @available;
 FORMAT_CLASS:
 foreach my $format (@formats) {
   my $class = "DateTime::Format::$format";
-  
-  eval "require $class;";
-  next FORMAT_CLASS if $@;
+
+  next FORMAT_CLASS unless optional_module($class);  
   
   push @available, {
     name       => $format,
@@ -90,4 +91,31 @@ while (my $t = <>) {
   else {
     print "   $t -- could not parse this\n"
   }
+}
+
+
+#####################################
+# Deal with required/optional modules
+
+sub require_module {
+  my $module = shift;
+  
+  eval "require $module";
+  if (my $e = $@) {
+    print STDERR "FATAL: $0 requires the Perl module '$module'.\n\n";
+    print STDERR "You can install it with:\n\n";
+    print STDERR "    cpan $module\n\n";
+    exit(1);
+  }
+  $module->import(@_);
+}
+
+sub optional_module {
+  my $module = shift;
+  
+  eval "require $module";
+  return 0 if $@;
+  
+  $module->import(@_);
+  return 1;
 }
