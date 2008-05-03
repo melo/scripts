@@ -2,6 +2,12 @@
 
 use strict;
 use warnings;
+use Getopt::Long;
+
+my $help;
+my $ok = GetOptions("help|?" => \$help);
+
+usage() if !$ok || $help;
 
 require_module('DateTime');
 
@@ -131,4 +137,36 @@ sub optional_module {
   
   $module->import(@_);
   return 1;
+}
+
+#######
+# Usage
+
+sub usage {
+  print STDERR <<USAGE;
+Usage: x-datetime-converter [--help] [-?]
+
+Reads datetime strings via stdin, and uses several methods to parse it.
+If the parse is sucessful, we print the parsed date in several formats.
+
+The list of formats supported is based on a list of DateTime::Format::*
+modules available.
+
+The following modules are used, if installed:
+
+USAGE
+  
+  foreach my $mod (@formats) {
+    print STDERR "  * DateTime::Format::$mod\n";
+  }
+
+  print STDERR <<USAGE;
+
+Make sure the modules are installed with:
+
+  cpan MODULE_NAME [MODULE_NAME]...
+
+USAGE
+  
+  exit(1);
 }
