@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+
+use strict;
+use DateTime;
+
+# Format classes to use for display
+my @formats = qw( DateParse MySQL HTTP Mail RSS );
+
+# Check for availability of format classes
+my @available;
+FORMAT_CLASS:
+foreach my $format (@formats) {
+  my $class = "DateTime::Format::$format";
+  
+  eval "require $class;";
+  next FORMAT_CLASS if $@;
+  
+  push @available, {
+    name       => $format,
+    class      => $class,
+    can_parse  => $class->can('parse_datetime'),
+    can_format => $class->can('format_datetime'),
+  };
+}
+
+# read dates
+while (my $t = <>) {
+  chomp($t);
+  my $dt;
+
+  if ($t =~ /^\d+$/) {
+    $dt = DateTime->from_epoch( epoch => $_ );
+  }
+  elsif ($t =~ /^(\d\d\d\d)[-\/](\d+)[-\/](\d+)$/) {
+    $dt = DateTime->new(
+        year  => $1,
+        month => $2,
+        day   => $3,
+    );
+  }
+  elsif ($t =~ /^(\d+)[-\/](\d+)[-\/](\d\d\d\d)$/) {
+    $dt = DateTime->new(
+        year  => $3,
+        month => $2,
+        day   => $1,
+    );
+  }
+  elsif ($t =~ /^(\d\d\d\d)[-\/](\d+)[-\/](\d+) (\d+):(\d+):(\d+)$/) {
+    $dt = DateTime->new(
+        year   => $1,
+        month  => $2,
+        day    => $3,
+        hour   => $4,
+        minute => $5,
+        second => $6,
+    );
+  }
+  elsif ($t =~ /^(\d+)[-\/](\d+)[-\/](\d\d\d\d) (\d+):(\d+):(\d+)$/) {
+    $dt = DateTime->new(
+        year   => $3,
+        month  => $2,
+        day    => $1,
+        hour   => $4,
+        minute => $5,
+        second => $6,
+    );
+  }
+  elsif ($t =~ /^(\d+):(\d+):(\d+)$/) {
+    $dt = DateTime->new(
+        hour   => $1,
+        minute => $2,
+        second => $3,
+    );
+  }
+  else {
+    foreach my $helper (@available) {
+      next unless $helper->{can_parse};
+      eval { $dt = $helper->{class}->parse_datetime($t) };
+      last if $dt;
+    }
+  }
+
+  if ($dt) {
+    print "    $t -- $dt ", $dt->epoch, " (hex ", sprintf('%0.4x', $dt->epoch) ,")\n";
+    foreach my $helper (@available) {
+      next unless $helper->{can_format};
+      print "    $t -- format $helper->{name} is: ", $helper->{class}->format_datetime($dt), "\n";
+    }
+  }
+  else {
+    print "   $t -- could not parse this\n"
+  }
+}
