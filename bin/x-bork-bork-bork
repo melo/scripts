@@ -1,4 +1,14 @@
 #!/usr/bin/perl -w
+#
+# Filters text into bork-bork-bork
+#
+# You send in some text like this little explanation and you'll
+# get this:
+#
+# Yuoo send een sumea text leekea thees leettlea ixplunashun und yuoo'll
+# get thees
+#
+# Pedro Melo <melo@simplicidade.org>
 
 use strict;
 use warnings;
