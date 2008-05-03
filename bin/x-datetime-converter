@@ -32,6 +32,9 @@ while (my $t = <>) {
   if ($t =~ /^\d+$/) {
     $dt = DateTime->from_epoch( epoch => $t );
   }
+  elsif ($dt = try_helper_parsers($t)) {
+    # we are done
+  }
   elsif ($t =~ /^(\d\d\d\d)[-\/](\d+)[-\/](\d+)$/) {
     $dt = DateTime->new(
         year  => $1,
@@ -73,13 +76,6 @@ while (my $t = <>) {
         second => $3,
     );
   }
-  else {
-    foreach my $helper (@available) {
-      next unless $helper->{can_parse};
-      eval { $dt = $helper->{class}->parse_datetime($t) };
-      last if $dt;
-    }
-  }
 
   if ($dt) {
     print "    $t -- $dt ", $dt->epoch, " (hex ", sprintf('%0.4x', $dt->epoch) ,")\n";
@@ -91,6 +87,23 @@ while (my $t = <>) {
   else {
     print "   $t -- could not parse this\n"
   }
+}
+
+
+####################################################
+# Try the helper classes to parse the datetime given
+
+sub try_helper_parsers {
+  my $t = shift;
+  my $dt;
+
+  foreach my $helper (@available) {
+    next unless $helper->{can_parse};
+    eval { $dt = $helper->{class}->parse_datetime($t) };
+    last if $dt;
+  }
+
+  return $dt;  
 }
 
 
