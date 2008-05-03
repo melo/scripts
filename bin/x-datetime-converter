@@ -29,7 +29,7 @@ while (my $t = <>) {
   my $dt;
 
   if ($t =~ /^\d+$/) {
-    $dt = DateTime->from_epoch( epoch => $_ );
+    $dt = DateTime->from_epoch( epoch => $t );
   }
   elsif ($t =~ /^(\d\d\d\d)[-\/](\d+)[-\/](\d+)$/) {
     $dt = DateTime->new(
