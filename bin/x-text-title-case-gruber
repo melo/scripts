@@ -1,0 +1,66 @@
+#!/usr/bin/env perl
+
+#   This filter changes all words to Title Caps, and attempts to be clever
+#   about *un*capitalizing small words like a/an/the in the input.
+#
+#   The list of "small words" which are not capped comes from
+#   the New York Times Manual of Style, plus 'vs' and 'v'. 
+#
+#   John Gruber
+#   http://daringfireball.net/
+#   10 May 2008
+#
+#   License: http://www.opensource.org/licenses/mit-license.php
+#
+
+
+use strict;
+use warnings;
+use utf8;
+use open IO  =>  ":utf8",        # UTF8 by default
+                 ":std";         # Apply to STDIN/STDOUT/STDERR
+
+my @small_words = qw(a an and as at but by en for if in of on or the to v[.]? via vs[.]?);
+my $small_re = join '|', @small_words;
+
+while(<>) {
+    my $line = "";
+    foreach my $s (split /( [:.;?!][ ] | (?:[ ]|^)["“] )/x) {
+        $s =~ s{
+                \b(
+                    [[:alpha:]]
+                    [[:lower:].'’]*
+                )\b
+            }{
+                my $w = $1;
+                # Skip words with inline dots, e.g. "del.icio.us" or "example.com"
+                ($w =~ m{ [[:alpha:]] [.] [[:alpha:]] }x) ? 
+                    $w :
+                    "\u\L$w";
+            }exg;
+        
+        # Lowercase our list of small words:
+        $s =~ s{\b($small_re)\b}{\L$1}igo;
+        
+
+        # If the first word in the title is a small word, then capitalize it:
+        $s =~ s{\A([[:punct:]]*)($small_re)\b}{$1\u$2}igo;
+
+        # If the last word in the title is a small word, then capitalize it:
+        $s =~ s{\b($small_re)([[:punct:]]*)\Z}{\u$1$2}igo;
+        
+        # Append current substring to output
+        $line .= $s;
+    }
+    
+    # Special Cases:
+    $line =~ s{ V(s?)\. }{ v$1. }g;         # "v." and "vs.":
+    $line =~ s{(['’])S\b}{$1s}g;            # 'S (otherwise you get "the SEC'S decision")
+    $line =~ s{\b(AT&T|Q&A)\b}{\U$1}ig;     # "AT&T" and "Q&A", which get tripped up by
+                                            # self-contained small words "at" and "a"
+    
+    print $line;
+}
+
+__END__
+
