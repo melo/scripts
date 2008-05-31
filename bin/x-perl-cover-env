@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Runs perl code with Devel::Cover enabled
+#
+# Optionaly recalculate the coverage report with -r
+#
+# Pedro Melo <melo@simplicidade.org>, 2008/05/30
+#
+
+if [ "$1" = '-r' ] ; then
+  RECALC_COVERAGE=1
+  shift
+fi
+
+# Run rest of command line in a subshell with coverage enabled
+(
+  MYPERL5OPT="-MDevel::Cover"
+  if [ -z "$PERL5OPT" ] ; then
+    PERL5OPT=$MYPERL5OPT
+  else
+    PERL5OPT="$PERL5OPT $MYPERL5OPT"
+  fi
+  export PERL5OPT
+  
+  $@
+)
+
+if [ "$RECALC_COVERAGE" = '1' ] ; then
+  cover
+  open cover_db/coverage.html
+fi
