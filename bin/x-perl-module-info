@@ -1,0 +1,63 @@
+#!/usr/bin/perl -w
+# 
+# Loads a set of modules and print usefull information about them
+# 
+# Pedro Melo <melo@simplicidade.org> 2004/12/23
+
+use strict;
+use warnings;
+
+usage() unless @ARGV;
+
+my @report;
+
+MODULE:
+foreach my $module (@ARGV) {
+  my %info = ( name => $module );
+  push @report, \%info;
+  
+  my $fname = "$module.pm";
+  $fname =~ s/::/\//g;
+  $info{file} = $fname;
+  
+  eval "require $module";
+  if (my $e = $@) {
+    if ($e =~ /^Can't locate $fname/) {
+      $info{not_found} = 1;
+    }
+    else {
+      $info{not_loaded} = 1;
+      $info{error} = $e;
+    }
+    
+    next MODULE;
+  }
+
+  $info{version} = $module->VERSION;
+  $info{path}    = $INC{$fname};
+}
+
+foreach my $info (@report) {
+  my $name = $info->{name};
+  foreach my $f (qw( name version file path not_found not_loaded )) {
+    print "$name $f: $info->{$f}\n" if $info->{$f};
+  }
+}
+
+#######
+# Usage
+
+sub usage {
+  print <<EOU;
+  
+x-perl-module-version MODULE...
+
+Loads all the MODULEs and print information about them:
+  * class name;
+  * version;
+  * relative file name;
+  * full path name of loaded version.
+
+EOU
+  exit(1);
+}
