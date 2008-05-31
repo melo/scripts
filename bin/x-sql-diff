@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Diff two SQL schema files
+#
+# ** DRAFT ** WORK IN PROGRESS **
+#
+# Pedro Melo <melo@simplicidade.org>, 2008/05/14
+
+
+# FIXME: use mktemp here
+base=/tmp/x-sql-diff
+old_sql=$base-old.sql
+new_sql=$base-new.sql
+diff_sql=$base-result.sql
+diff_errors=$base.errors
+
+# Clear AUTO_INCREMENTS, need to use copies
+cp $1 $old_sql
+cp $2 $new_sql
+perl -pi -e 's/AUTO_INCREMENT=\d+//g' $old_sql $new_sql
+
+# Do the diff
+sqlt-diff --ignore-index-names --ignore-constraint-names -c $old_sql=MySQL $new_sql=MySQL > $diff_sql 2> $diff_errors
+
+# Show the diff result
+echo
+echo
+cat $diff_sql
+echo
+echo
+
+if [ ! -s $diff_sql ] ; then
+  echo 
+  echo "$diff_sql is empty, probably we got errors, check below"
+  echo
+  cat $diff_errors
+  echo
+  echo "End of error dump"
+  echo
+  exit 1
+fi
+
+action=n
+
+if [ "`head -1 $diff_sql`" != "No differences found." ] ; then
+  echo "Keep the file or delete it? [k/D]"
+  read action
+  if [ "$action" == "k" ] ; then
+    cp $diff_sql .
+    echo $diff_sql is now in `pwd`
+  fi
+else
+  echo "**** Database is up-to-date, nothing required."
+fi
+
+rm -f $base*
