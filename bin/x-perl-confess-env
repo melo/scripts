@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Make sure all croaks will confess
+#
+# Pedro Melo <melo@simplicidade.org>, 2008/05/30
+#
+
+MYPERL5OPT="-MCarp=verbose"
+if [ -z "$PERL5OPT" ] ; then
+  PERL5OPT=$MYPERL5OPT
+else
+  PERL5OPT="$PERL5OPT $MYPERL5OPT"
+fi
+export PERL5OPT
+
+$@
