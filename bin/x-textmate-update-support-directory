@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Update the TextMate Support directory from Subversion
+#
+# Recomended usage: run this from cron everyday with a
+# crontab entry like -
+#
+#    12 12 * * * PATH_TO/x-textmate-update-support-directory
+# 
+# Pedro Melo <melo@simplicidade.org>, 2008/05/23
+
+
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=
+
+# Update main Application Support directory
+cd '/Library/Application Support/TextMate' && svn --quiet update
+
+# Check for updatable bundles in the personal Application Support directory
+cd ~
+cd "Library/Application Support/TextMate"
+
+for dir in `find . -name .git -type d` ; do
+  ( cd $dir/.. && git pull --quiet && git-gc --quiet )
+done
+
+osascript -e 'tell app "TextMate" to reload bundles'
+
+growlnotify -s "TextMate updated" -m "Support dir and local bundles updated" &
