@@ -1,0 +1,10 @@
+#!/usr/bin/perl -w
+#
+# Reformats a text file
+#
+# Pedro Melo <melo@simplicidade.org>, 2008/02/12
+
+use strict;
+use Text::Autoformat;
+
+autoformat({ all => 1 });
