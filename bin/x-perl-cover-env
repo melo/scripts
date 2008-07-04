@@ -26,6 +26,10 @@ fi
 )
 
 if [ "$RECALC_COVERAGE" = '1' ] ; then
+  # test_for_covered=`covered`
+  # if [ $? = 255 ] ; then
+  #   covered runs
+  # fi
   cover
   open cover_db/coverage.html
 fi
