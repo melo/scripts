@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Updates you git.git clone, recompiles, installs and activates the latest
+# version
+#
+
+# Set this to the place where git.git clone is at
+# in you local filesystem
+GIT_CLONE_DIR=$HOME/work/track/git
+
+# Where all the git versions will be placed
+# Each version will be inside a directory, like git-v1.5.6.1-204-g6991357
+# Current active version will be a symblink 'git'
+# so you can add $BASE/git/bin to your PATH
+BASE=/usr/local
+
+### Nothing more to tweak ###
+
+cd $GIT_CLONE_DIR
+if [ $? != 0 ] ; then
+	echo
+	echo "** FATAL **: could not chdir to GIT_CLONE_DIR $GIT_CLONE_DIR"
+	echo "Edit this script and tell me where the git.git clone is"
+	exit 1
+fi
+
+echo
+echo "This script will pull the lastest git.git master branch, recompile,"
+echo "install and activate."
+echo
+echo "Sure? [y/N]"
+
+read confirmation
+
+if [ "$confirmation" != "y" ] ; then exit ; fi
+
+if [ -e configure ] ; then
+  make distclean
+fi
+
+git pull
+
+version=`git describe`
+
+if [ -d "$BASE/git-$version" ] ; then
+	echo
+	echo "**** You already have the latest git version ($version) installed"
+	echo
+	exit 0
+fi
+
+echo
+echo "******* Compiling version $version"
+echo
+
+make configure
+./configure --prefix=$BASE/git-$version
+make all
+sudo make install
+
+sudo sh -c "cd $BASE; rm git; ln -s git-$version git"
+
+echo "Check your PATH to make sure $base/git/bin is in there"
+echo
+echo "You are running verion (running git -v now):"
+git --version
