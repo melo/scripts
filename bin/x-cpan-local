@@ -1,0 +1,6 @@
+#!/usr/bin/env perl
+#
+# Creates a local installation of CPAN modules and runs CPAN shell properly
+# configured to use it
+#
+
