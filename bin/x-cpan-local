@@ -5,6 +5,30 @@
 #
 
 
+###########
+# Utilities
+
+sub load_cpan_config {
+  my @dirs_to_search;
+  
+  eval {
+    require File::HomeDir;
+    push @dirs_to_search, File::HomeDir->my_data;
+    push @dirs_to_search, File::HomeDir->my_home;
+  };    
+  push @dirs_to_search, $ENV{HOME};
+  
+  unshift @INC, grep { $_ } @dirs_to_search;
+  
+  eval { require CPAN::MyConfig };
+  eval { require CPAN::Config } unless $INC{'CPAN/MyConfig.pm'};
+  
+  # As a default, use an empty config
+  # We will fill the details later
+  # $CPAN::Config ||= {};
+}
+
+
 sub usage {
   print <<"  USAGE";
 Usage: x-cpan-local NAME
