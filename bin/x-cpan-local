@@ -9,6 +9,7 @@ use warnings;
 use File::Spec;
 use File::Path;
 
+# We need a name argument and make sure its valid
 my ($name) = @ARGV;
 
 if (!$name) {
