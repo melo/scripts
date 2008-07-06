@@ -9,6 +9,7 @@ use warnings;
 use File::Spec;
 use File::Path;
 use CPAN ();
+use Data::Dumper;
 
 # We need a name argument and make sure its valid
 my ($name) = @ARGV;
@@ -37,7 +38,7 @@ make_sure_dir_exists($local_cfg_dir);
 
 my $name_config = File::Spec->catfile($local_cfg_dir, 'MyConfig.pm');
 if (! -e $name_config) {
-  create_initial_file($name_config);
+  create_initial_file($name_config, $base_dir);
 }
 
 # Load the local configuration file
@@ -87,7 +88,50 @@ sub make_sure_dir_exists {
 }
 
 sub create_initial_file {
+  my ($file_name, $base_dir) = @_;
   
+  # Load the current CPAN shell configuration
+  CPAN::HandleConfig->load;
+  
+  # remove any sudo's from some of the command lines
+  my $cc = $CPAN::Config;
+  while (my ($k, $v) = each %$cc) {
+    next unless $k =~ /_command$/ && $v;
+    $cc->{$k} =~ s/^\s*sudo\s+//;
+  }
+  
+  # make sure the instalations will be local
+  my ($k, $v);
+  
+  # ... for Makefile.PL based installs
+  $k = 'makepl_arg';
+  $v = $cc->{$k} || '';
+  $v = ($v? "$v " : '')
+     . "LIB=$base_dir/lib "
+     . "INSTALLMAN1DIR=$base_dir/man/man1 "
+     . "INSTALLMAN3DIR=$base_dir/man/man3 "
+     . "INSTALLSCRIPT=$base_dir/bin "
+     . "INSTALLBIN=$base_dir/bin";
+  $cc->{$k} = $v;
+  
+  # ... for Build.PL based installs
+  $k = 'mbuildpl_arg';
+  $v = $cc->{$k} || '';
+  $v = ($v? "$v " : '')
+     . "--lib=$base_dir/lib "
+     . "--installman1dir=$base_dir/man/man1 "
+     . "--installman3dir=$base_dir/man/man3 "
+     . "--installscript=$base_dir/bin "
+     . "--installbin=$base_dir/bin";     
+  $cc->{$k} = $v;
+  
+  # Lets lie about where we came from
+  # We use this trick to make sure commit inside the shell will write to
+  # the proper place
+  $INC{'CPAN/MyConfig.pm'} = $file_name;
+
+  # and let CPAN do all the work
+  CPAN::HandleConfig->commit;
 }
 
 
