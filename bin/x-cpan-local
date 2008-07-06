@@ -30,6 +30,16 @@ my $base_dir = File::Spec->catdir($ENV{HOME}, '.my_perl_lib', $name);
 make_sure_dir_exists($base_dir);
 
 
+# Make sure we have a local config file, create one if we need to
+my $local_cfg_dir = File::Spec->catdir($base_dir, 'CPAN');
+make_sure_dir_exists($local_cfg_dir);
+
+my $name_config = File::Spec->catfile($local_cfg_dir, 'MyConfig.pm');
+if (! -e $name_config) {
+  create_initial_file($name_config);
+}
+
+
 ###########
 # Utilities
 
@@ -88,3 +98,10 @@ sub make_sure_dir_exists {
   
   return $dir;
 }
+
+sub create_initial_file {
+  
+}
+
+
+1;
