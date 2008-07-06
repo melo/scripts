@@ -4,6 +4,25 @@
 # configured to use it
 #
 
+use strict;
+use warnings;
+
+my ($name) = @ARGV;
+
+if (!$name) {
+  usage();
+  exit(2);
+}
+
+if ($name !~ /^[a-zA-Z0-9_.-]+$/) {
+  fatal(
+    "name of local repo is invalid - '$name'",
+    "Must be composed of letters, numbers, dash, dot, and underscore",
+  );
+}
+
+
+
 
 ###########
 # Utilities
@@ -39,3 +58,12 @@ Add `$ENV{HOME}/.my_perl_lib/NAME` to your lib to use.
   USAGE
 }
 
+sub fatal {
+  my ($msg, @extra) = @_;
+  
+  print "FATAL: $msg\n";
+  foreach my $extra (@extra) {
+    print "    $extra\n";
+  }
+  exit(1);
+}
