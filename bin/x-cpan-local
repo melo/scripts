@@ -4,3 +4,14 @@
 # configured to use it
 #
 
+
+sub usage {
+  print <<"  USAGE";
+Usage: x-cpan-local NAME
+
+Creates a local directory to install modules named `NAME`.
+Add `$ENV{HOME}/.my_perl_lib/NAME` to your lib to use.
+
+  USAGE
+}
+
