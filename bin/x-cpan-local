@@ -23,14 +23,10 @@ if ($name !~ /^[a-zA-Z0-9_.-]+$/) {
   );
 }
 
-my $base_dir = File::Spec->catdir($ENV{HOME}, '.my_perl_lib', $name);
-if ( ! -d $base_dir ) {
-  mkpath($base_dir, { verbose => 0, error => \my $err });
-  map { my ($p, $m) = %$_; $_ = "$m creating '$p'" } @$err;
-  fatal("Could not create base directory '$base_dir'", @$err)
-    unless -d $base_dir;
-}
 
+# Make sure we have the directory for the local perl lib
+my $base_dir = File::Spec->catdir($ENV{HOME}, '.my_perl_lib', $name);
+make_sure_dir_exists($base_dir);
 
 
 ###########
@@ -75,4 +71,19 @@ sub fatal {
     print "    $extra\n";
   }
   exit(1);
+}
+
+sub make_sure_dir_exists {
+  my $dir = shift;
+  
+  return if -d $dir;
+
+  mkpath($dir, { verbose => 0, error => \my $err });
+  
+  unless (-d $dir) {
+    map { my ($p, $m) = %$_; $_ = "$m creating '$p'" } @$err;
+    fatal("Could not create base directory '$base_dir'", @$err);
+  }
+  
+  return $dir;
 }
