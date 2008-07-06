@@ -45,7 +45,7 @@ unshift @INC, $base_dir;
 require CPAN::MyConfig;
 
 # Run the CPAN shell
-CPAN::shell();
+CPAN::shell(Local::Prompt->new($name));
 
 
 ###########
@@ -111,5 +111,30 @@ sub create_initial_file {
   
 }
 
+
+##########################################################
+# Create a new CPAN Shell prompt with our local name on it
+
+package Local::Prompt;
+
+use base 'CPAN::Prompt';
+
+sub new {
+  my $class = shift;
+  my $name  = shift;
+  
+  my $self = $class->SUPER::new(@_);
+  $self->{local_name} = $name || '';
+  
+  return $self;
+}
+
+sub as_string {
+  my $self = shift;
+  
+  my $prompt = $self->SUPER::as_string(@_);
+
+  return "[$self->{local_name}] $prompt";
+}
 
 1;
