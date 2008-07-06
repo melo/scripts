@@ -8,6 +8,7 @@ use strict;
 use warnings;
 use File::Spec;
 use File::Path;
+use CPAN ();
 
 # We need a name argument and make sure its valid
 my ($name) = @ARGV;
@@ -38,6 +39,13 @@ my $name_config = File::Spec->catfile($local_cfg_dir, 'MyConfig.pm');
 if (! -e $name_config) {
   create_initial_file($name_config);
 }
+
+# Load the local configuration file
+unshift @INC, $base_dir;
+require CPAN::MyConfig;
+
+# Run the CPAN shell
+CPAN::shell();
 
 
 ###########
