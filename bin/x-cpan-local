@@ -12,7 +12,7 @@ use Data::Dumper;
 use Config;
 
 # We need a name argument and make sure its valid
-my ($name) = @ARGV;
+my $name = shift @ARGV;
 
 if (!$name) {
   usage();
@@ -56,8 +56,18 @@ if (! -e $name_config) {
 }
 
 
-# Run the CPAN shell
-CPAN::shell();
+# Run the CPAN shell interactively
+CPAN::shell() unless @ARGV;
+
+# Install each module
+MODULE:
+foreach my $module (@ARGV) {
+  if ($module eq 'install') {
+    print "***** install 'install' module? Use the interactive version.\n";
+    next MODULE;
+  }
+  CPAN::Shell->install($module);
+}
 
 
 ###########
