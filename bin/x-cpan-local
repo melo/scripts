@@ -19,7 +19,7 @@ if (!$name) {
   exit(2);
 }
 
-if ($name !~ /^[a-zA-Z0-9_.-]+$/) {
+if ($name !~ /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/) {
   fatal(
     "name of local repo is invalid - '$name'",
     "Must be composed of letters, numbers, dash, dot, and underscore",
