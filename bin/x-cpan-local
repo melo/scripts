@@ -105,7 +105,7 @@ sub create_initial_file {
   CPAN::HandleConfig->load;
   
   # remove any sudo's from some of the command lines
-  my $cc = $CPAN::Config;
+  my $cc = do { no warnings; $CPAN::Config };
   while (my ($k, $v) = each %$cc) {
     next unless $k =~ /_command$/ && $v;
     $cc->{$k} =~ s/^\s*sudo\s+//;
