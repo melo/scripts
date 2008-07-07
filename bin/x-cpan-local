@@ -136,6 +136,14 @@ sub create_initial_file {
      . "--installbin=$base_dir/bin";     
   $cc->{$k} = $v;
   
+  # remove uninst's
+  $k = 'make_install_arg';
+  $cc->{$k} =~ s/UNINST=1//g
+    if exists $cc->{$k} && $cc->{$k};
+  $k = 'mbuild_install_arg';
+  $cc->{$k} =~ s/--uninst 1//g
+    if exists $cc->{$k} && $cc->{$k};
+  
   # Lets lie about where we came from
   # We use this trick to make sure commit inside the shell will write to
   # the proper place
