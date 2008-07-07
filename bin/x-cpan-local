@@ -8,8 +8,8 @@ use strict;
 use warnings;
 use File::Spec;
 use File::Path;
-use CPAN ();
 use Data::Dumper;
+use Config;
 
 # We need a name argument and make sure its valid
 my ($name) = @ARGV;
@@ -31,6 +31,20 @@ if ($name !~ /^[a-zA-Z0-9_.-]+$/) {
 my $base_dir = File::Spec->catdir($ENV{HOME}, '.my_perl_lib', $name);
 make_sure_dir_exists($base_dir);
 
+# Make sure we have a sane environment
+my @libs = grep { $_ }
+    "$base_dir/lib/$Config{archname}",
+    "$base_dir/lib",
+    $base_dir,
+    split(/:/, $ENV{PERL5LIB} || '');
+
+unshift @INC, @libs;
+$ENV{PERL5LIB} = join(':', @libs);
+
+
+# Lets load CPAN now, we should find all the modules
+require CPAN;
+
 
 # Make sure we have a local config file, create one if we need to
 my $local_cfg_dir = File::Spec->catdir($base_dir, 'CPAN');
@@ -41,12 +55,9 @@ if (! -e $name_config) {
   create_initial_file($name_config, $base_dir);
 }
 
-# Load the local configuration file
-unshift @INC, $base_dir;
-require CPAN::MyConfig;
 
 # Run the CPAN shell
-CPAN::shell(Local::Prompt->new($name));
+CPAN::shell();
 
 
 ###########
@@ -132,32 +143,6 @@ sub create_initial_file {
 
   # and let CPAN do all the work
   CPAN::HandleConfig->commit;
-}
-
-
-##########################################################
-# Create a new CPAN Shell prompt with our local name on it
-
-package Local::Prompt;
-
-use base 'CPAN::Prompt';
-
-sub new {
-  my $class = shift;
-  my $name  = shift;
-  
-  my $self = $class->SUPER::new(@_);
-  $self->{local_name} = $name || '';
-  
-  return $self;
-}
-
-sub as_string {
-  my $self = shift;
-  
-  my $prompt = $self->SUPER::as_string(@_);
-
-  return "[$self->{local_name}] $prompt";
 }
 
 1;
