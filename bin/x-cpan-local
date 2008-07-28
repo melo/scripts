@@ -126,32 +126,17 @@ sub create_initial_file {
   
   # ... for Makefile.PL based installs
   $k = 'makepl_arg';
-  $v = $cc->{$k} || '';
-  $v = ($v? "$v " : '')
-     . "LIB=$base_dir/lib "
-     . "INSTALLMAN1DIR=$base_dir/man/man1 "
-     . "INSTALLMAN3DIR=$base_dir/man/man3 "
-     . "INSTALLSCRIPT=$base_dir/bin "
-     . "INSTALLBIN=$base_dir/bin";
+  $v = "INSTALL_BASE=$base_dir";
   $cc->{$k} = $v;
   
   # ... for Build.PL based installs
-  $k = 'mbuildpl_arg';
-  $v = $cc->{$k} || '';
-  $v = ($v? "$v " : '')
-     . "--lib=$base_dir/lib "
-     . "--installman1dir=$base_dir/man/man1 "
-     . "--installman3dir=$base_dir/man/man3 "
-     . "--installscript=$base_dir/bin "
-     . "--installbin=$base_dir/bin";     
+  $k = 'mbuild_install_arg';
+  $v = "--install_base=$base_dir";
   $cc->{$k} = $v;
   
   # remove uninst's
   $k = 'make_install_arg';
   $cc->{$k} =~ s/UNINST=1//g
-    if exists $cc->{$k} && $cc->{$k};
-  $k = 'mbuild_install_arg';
-  $cc->{$k} =~ s/--uninst 1//g
     if exists $cc->{$k} && $cc->{$k};
   
   # Lets lie about where we came from
