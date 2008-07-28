@@ -42,11 +42,11 @@ my @libs = grep { $_ }
 
 unshift @INC, @libs;
 $ENV{PERL5LIB} = join(':', @libs);
+$ENV{PATH} = "$base_dir/bin:$ENV{PATH}";
 
 
 # Lets load CPAN now, we should find all the modules
 require CPAN;
-
 
 # Make sure we have a local config file, create one if we need to
 my $local_cfg_dir = File::Spec->catdir($base_dir, 'CPAN');
