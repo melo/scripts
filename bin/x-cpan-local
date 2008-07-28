@@ -53,9 +53,7 @@ my $local_cfg_dir = File::Spec->catdir($base_dir, 'CPAN');
 make_sure_dir_exists($local_cfg_dir);
 
 my $name_config = File::Spec->catfile($local_cfg_dir, 'MyConfig.pm');
-if (! -e $name_config) {
-  create_initial_file($name_config, $base_dir);
-}
+create_initial_file($name_config, $base_dir);
 
 
 # Run the CPAN shell interactively
