@@ -33,6 +33,8 @@ make_sure_dir_exists($base_dir);
 
 # Make sure we have a sane environment
 my @libs = grep { $_ }
+    "$base_dir/lib/perl5/$Config{archname}",
+    "$base_dir/lib/perl5",
     "$base_dir/lib/$Config{archname}",
     "$base_dir/lib",
     $base_dir,
