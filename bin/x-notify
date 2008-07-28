@@ -11,7 +11,7 @@
 # Pedro Melo <melo@simplicidade.org>
 #
 
-if [ -z "$@" ] ; then
+if [ -z "$1" ] ; then
   cat <<USAGE
 Usage: x-notify cmd
 
