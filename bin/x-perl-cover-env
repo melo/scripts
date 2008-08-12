@@ -22,7 +22,11 @@ fi
   fi
   export PERL5OPT
   
-  $@
+  if [ -z "$1" ] ; then
+    echo PERL5OPT=$PERL5OPT
+	else
+    $@
+  fi
 )
 
 if [ "$RECALC_COVERAGE" = '1' ] ; then
