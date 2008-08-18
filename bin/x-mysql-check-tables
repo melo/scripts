@@ -29,11 +29,66 @@ $dsn .= "database=$db;" if $db;
 my $dbh = DBI->connect($dsn, $user, $pwd) ||
   die $DBI::errstr;
 
-if ($db) { check_tables($dbh) }
-else     { list_dbs($dbh)     }
+if ($db) { check_tables($dbh, $db) }
+else     { list_dbs($dbh)          }
 
 ##############
 # Check tables
+
+sub check_tables {
+  my ($dbh, $db) = @_;
+  
+  my $tables = $dbh->selectcol_arrayref(q{
+    SHOW TABLES
+  });
+  
+  if (!@$tables) {
+    print "No tables found in database $db\n";
+    return;
+  }
+  
+  print "Found ".@$tables." tables in db $db:\n";
+  foreach my $table (sort @$tables) {
+    check_table($dbh, $table);
+  }
+  print "\n";
+  
+  return;
+}
+
+sub check_table {
+  my ($dbh, $table) = @_;
+  
+  my $result = $dbh->selectall_arrayref(
+    qq{ CHECK TABLE $table },
+    { Slice => {} },
+  );
+  
+  if (@$result == 1 && is_ok($result->[0])) {
+    print "  $table: is OK\n";
+    return;
+  }
+  
+  print "\n  $table:\n";
+  foreach my $row (@$result) {
+    print "      $row->{Op}: $row->{Msg_type} => '$row->{Msg_text}'\n";
+    print "  ** Table is OK **\n" if is_ok($row);
+  }
+  print "\n\n"
+  
+  return;
+}
+
+sub is_ok {
+  my ($report) = @_;
+  
+  return 1
+    if $report->{Msg_type} eq 'status'
+    && $report->{Msg_text} eq 'OK';
+    
+  return 0;
+}
+
 
 ##########
 # List DBs
