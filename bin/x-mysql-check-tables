@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+#
+# Check all MySQL tables
+#
+
+use strict;
+use warnings;
+use Getopt::Long;
+use DBI;
+
+my $host;
+my $user;
+my $pwd = $ENV{MYSQL_PASSWORD};
+
+my $ok = GetOptions(
+  "host=s", \$host,
+  "user=s", \$user,
+  "password=s", \$pwd,
+);
+
+usage() if !$ok;
+
+my $db = shift @ARGV;
+
+my $dsn = 'dbi:mysql:';
+$dsn .= "host=$host;"   if $host;
+$dsn .= "database=$db;" if $db;
+
+my $dbh = DBI->connect($dsn, $user, $pwd) ||
+  die $DBI::errstr;
+
+if ($db) { check_tables($dbh) }
+else     { list_dbs($dbh)     }
+
+##############
+# Check tables
+
+##########
+# List DBs
+
+sub list_dbs {
+  my ($dbh) = @_;
+  
+  my $dbs = $dbh->selectcol_arrayref(q{
+    SHOW DATABASES
+  });
+  
+  if (!@$dbs) {
+    print "No databases found\n";
+    return;
+  }
+
+  print "Found ".@$dbs." databases:\n";
+  foreach my $db (@$dbs) {
+    print "  $db\n";
+  }
+  print "\n";
+  
+  return;
+}
