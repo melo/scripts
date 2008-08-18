@@ -11,11 +11,13 @@ use DBI;
 my $host;
 my $user;
 my $pwd = $ENV{MYSQL_PASSWORD};
+my $askpass;
 
 my $ok = GetOptions(
   "host=s", \$host,
   "user=s", \$user,
   "password=s", \$pwd,
+  "askpass", \$askpass,
 );
 
 usage() if !$ok;
@@ -25,6 +27,8 @@ my $db = shift @ARGV;
 my $dsn = 'dbi:mysql:';
 $dsn .= "host=$host;"   if $host;
 $dsn .= "database=$db;" if $db;
+
+$pwd = prompt_noecho("Enter password:") if $askpass;
 
 my $dbh = DBI->connect($dsn, $user, $pwd) ||
   die $DBI::errstr;
@@ -74,7 +78,7 @@ sub check_table {
     print "      $row->{Op}: $row->{Msg_type} => '$row->{Msg_text}'\n";
     print "  ** Table is OK **\n" if is_ok($row);
   }
-  print "\n\n"
+  print "\n\n";
   
   return;
 }
@@ -113,3 +117,33 @@ sub list_dbs {
   
   return;
 }
+
+
+#######
+# Utils
+
+# Stolen from maatkit
+sub prompt_noecho {
+   my ( $prompt ) = @_;
+   local $| = 1;
+
+   print $prompt
+      or die "Cannot print: $!";
+
+   my $response;
+   eval {
+      require Term::ReadKey;
+      Term::ReadKey::ReadMode('noecho');
+      chomp($response = <STDIN>);
+      Term::ReadKey::ReadMode('normal');
+      print "\n"
+         or die "Cannot print: $!";
+   };
+   if ( $@ ) {
+      die "Cannot read response; is Term::ReadKey installed? $@";
+   }
+   
+   return $response;
+}
+
+
