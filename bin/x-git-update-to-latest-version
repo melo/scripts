@@ -75,7 +75,16 @@ if [ -z "$check_path" ] ; then
   echo "      $BASE/git/bin"
   echo
 fi
+
+echo
+echo Current git version: `readlink $BASE/git`
+echo Switching to version: git-$version
+echo
+
+sudo sh -c "cd $BASE; rm -f git; ln -s git-$version git"
+
 echo
 echo "You are running verion (running git -v now):"
+echo
 git --version
 
