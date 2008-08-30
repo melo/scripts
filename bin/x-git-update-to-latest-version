@@ -61,7 +61,7 @@ make distclean
 
 sudo sh -c "cd $BASE; rm git; ln -s git-$version git"
 
-echo "Check your PATH to make sure $base/git/bin is in there"
+echo "Check your PATH to make sure $BASE/git/bin is in there"
 echo
 echo "You are running verion (running git -v now):"
 git --version
