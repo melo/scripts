@@ -59,7 +59,13 @@ make all
 sudo make install
 make distclean
 
-sudo sh -c "cd $BASE; rm git; ln -s git-$version git"
+echo
+echo "******* Installing man pages"
+echo
+
+git co origin/man 
+sudo rsync -a --delete man? /usr/local/git/man
+git co master
 
 check_path=`echo $PATH | perl -pe 's/:/\n/g' | egrep ^$BASE/git/bin$`
 if [ -z "$check_path" ] ; then
