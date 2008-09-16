@@ -57,7 +57,7 @@ make configure
 ./configure --prefix=$BASE/git-$version
 make all
 sudo make install
-make distclean
+
 
 echo
 echo "******* Installing man pages"
@@ -65,6 +65,12 @@ echo
 
 sudo make quick-install-doc
 
+
+echo
+echo "******* Cleanup phase"
+echo
+
+make distclean
 
 
 check_path=`echo $PATH | perl -pe 's/:/\n/g' | egrep ^$BASE/git/bin$`
