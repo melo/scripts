@@ -1,0 +1,17 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+LINE:
+while (my $line = <>) {
+	print $line;
+	
+	if ($line =~ m/^\s*package\s*/) {
+	  print qq{our \$trace_frame_counter = 0; }
+	}
+	elsif (my ($sub) = $line =~ m/^sub\s+(\S+)/) {
+		print qq{  local \$trace_frame_counter; \$trace_frame_counter++;    ### TRACING\n};
+		print qq{  print STDERR "TRACE [\$trace_frame_counter] ($sub)\\n";  ### TRACING\n};
+	}
+}
