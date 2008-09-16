@@ -63,9 +63,9 @@ echo
 echo "******* Installing man pages"
 echo
 
-git co origin/man 
-sudo rsync -a --delete man? /usr/local/git/man
-git co master
+sudo make quick-install-doc
+
+
 
 check_path=`echo $PATH | perl -pe 's/:/\n/g' | egrep ^$BASE/git/bin$`
 if [ -z "$check_path" ] ; then
