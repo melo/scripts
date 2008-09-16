@@ -73,12 +73,25 @@ echo
 make distclean
 
 
+echo
+echo "******* Check environment"
+echo
+
 check_path=`echo $PATH | perl -pe 's/:/\n/g' | egrep ^$BASE/git/bin$`
 if [ -z "$check_path" ] ; then
   echo
   echo "WARNING: your PATH must be changed to include"
   echo
   echo "      $BASE/git/bin"
+  echo
+fi
+
+check_manpath=`echo $MANPATH | perl -pe 's/:/\n/g' | egrep ^$BASE/git/share/man$`
+if [ -z "$check_manpath" ] ; then
+  echo
+  echo "WARNING: your MANPATH must be changed to include"
+  echo
+  echo "      $BASE/git/share/man"
   echo
 fi
 
