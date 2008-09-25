@@ -40,7 +40,7 @@ fi
 
 git pull
 
-version=`git describe`
+version=`git describe --always`
 
 if [ -d "$BASE/git-$version" ] ; then
 	echo
