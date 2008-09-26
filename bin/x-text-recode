@@ -6,11 +6,12 @@ use bytes;
 use Encode;
 use Getopt::Long;
 
-my ($to, $from, $list) = ('utf8', 'utf8');
+my ($to, $from, $list, $guess) = ('utf8', 'utf8');
 my $ok = GetOptions(
   "from=s" => \$from,
   "to=s"   => \$to,
   "list"   => \$list,
+  "guess"  => \$guess,
 );
 usage() unless $ok;
 
@@ -21,6 +22,14 @@ if ($list) {
   }
   foreach my $enc (Encode->encodings(":all")) {
     print $enc, "\n";
+  }
+  exit(0);
+}
+
+if ($guess) {
+  my $line = <>;
+  foreach my $enc (Encode->encodings(":all")) {
+    print $enc, "\t", encode($to, decode($enc, $line));
   }
   exit(0);
 }
