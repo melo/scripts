@@ -1,0 +1,19 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use bytes;
+use Encode;
+use Getopt::Long;
+
+my ($to, $from) = ('utf8', 'utf8');
+my $ok = GetOptions(
+  "from=s" => \$from,
+  "to=s"   => \$to,
+);
+usage() unless $ok;
+exit if $to eq $from;
+
+while (<>) {
+  print encode($to, decode($from, $_));
+}
