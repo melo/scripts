@@ -12,7 +12,6 @@ my $ok = GetOptions(
   "to=s"   => \$to,
 );
 usage() unless $ok;
-exit if $to eq $from;
 
 while (<>) {
   print encode($to, decode($from, $_));
