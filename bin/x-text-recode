@@ -6,12 +6,24 @@ use bytes;
 use Encode;
 use Getopt::Long;
 
-my ($to, $from) = ('utf8', 'utf8');
+my ($to, $from, $list) = ('utf8', 'utf8');
 my $ok = GetOptions(
   "from=s" => \$from,
   "to=s"   => \$to,
+  "list"   => \$list,
 );
 usage() unless $ok;
+
+if ($list) {
+  if (-t \*STDOUT) {
+    print "Supported encodings\n";
+    print "-------------------\n";
+  }
+  foreach my $enc (Encode->encodings(":all")) {
+    print $enc, "\n";
+  }
+  exit(0);
+}
 
 while (<>) {
   print encode($to, decode($from, $_));
