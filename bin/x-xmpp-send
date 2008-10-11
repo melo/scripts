@@ -1,0 +1,89 @@
+#!/usr/bin/env perl
+#
+# Send a message to a XMPP ID using the Tarpipe SEND api
+#
+
+use strict;
+use warnings;
+use LWP::UserAgent;
+use HTTP::Request::Common qw( POST );
+use Getopt::Long;
+
+my ($token, $message, @jids);
+my $ok = GetOptions(
+  "token=s"   => \$token,
+  "message=s" => \$message,
+);
+
+usage() unless $ok;
+usage('Missing JIDs') unless @ARGV;
+
+@jids = @ARGV;
+@ARGV = ();
+
+$message = _read_message_from_stdin() unless defined $message;
+$token = _read_xmpp_send_token()      unless defined $token;
+
+my $ua = LWP::UserAgent->new;
+
+foreach my $jid (@jids) {
+  my $request = POST('http://tarpipe.simplicidade.org:4335/send', [
+    token => $token,
+    to    => $jid,
+    body  => $message,
+  ]);
+	my $result = $ua->request($request);
+
+	print "$jid: ", $result->code, ' ', $result->content, "\n";
+}
+
+########################################
+# Read the token to use from config file
+
+sub _read_xmpp_send_token {
+  my $path = $ENV{HOME}.'/.xmpp_send_token';
+  
+  usage('Could not read token from configuration file')
+    unless open(my $fh, '<', $path);
+  
+  my $token;
+  local $_;
+  while (<$fh>) {
+    ($token) = m/^\s*([a-fA-F0-9]{32})\s*$/;
+    last if $token;
+  }
+  
+  return $token;
+}
+
+
+#########################
+# Read message from STDIN
+
+sub _read_message_from_stdin {
+  print "Type your message, hit CTRL-D to send, CTRL-C to abort.\n\n" if -t;
+  
+  local $/;
+  return scalar(<>);
+}
+
+
+#######
+# Usage
+
+sub usage {
+  my ($mesg) = @_;
+  
+  print <<'EOU';
+Usage: x-xmpp-send [-m|--message message] [-t|--token token] jid [jid]*
+
+If message is missing, it will read it from STDIN.
+
+If token is missing, we check the $HOME/.xmpp_send_token file.
+
+EOU
+
+  print "FATAL: $mesg\n" if $mesg;
+  
+  exit(1);
+}
