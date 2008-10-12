@@ -24,6 +24,8 @@ usage('Missing JIDs') unless @ARGV;
 $message = _read_message_from_stdin() unless defined $message;
 $token = _read_xmpp_send_token()      unless defined $token;
 
+chomp($message);
+
 my $ua = LWP::UserAgent->new;
 
 foreach my $jid (@jids) {
