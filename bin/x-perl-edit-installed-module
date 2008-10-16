@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use BSD::Resource;
+
+my $module = shift;
+usage(1) unless $module;
+
+my $module_dir = $module;
+$module_dir =~ s/::/\//g;
+my $module_file = $module_dir.'.pm';
+
+my $editor = $ENV{EDITOR};
+usage(1, 'You must define the EDITOR environment') unless $editor;
+
+foreach my $inc (@INC) {
+  my $path = "$inc/$module_file";
+  next unless -e $path;
+  
+  my @paths = ($path);
+  my $path_dir = "$inc/$module_dir";
+  push @paths, $path_dir if -d $path_dir;
+  
+  my $ru = getrusage();
+  use Data::Dumper; print STDERR ">>>>>> ", Dumper($ru);
+  
+  exec($editor, @paths);
+  die("Could not exec() '$editor': $!");
+}
+
+print "Module '$module' not found in \@INC\n";
+exit(0);
+
+
+sub usage {
+  my ($exit_code, $mesg) = @_;
+  
+  print <<"  EOU";
+Usage: x-perl-edit-installed-module MODULE
+
+Starts your \$EDITOR with the installed version of MODULE
+  EOU
+  
+  print "FATAL: $mesg\n" if $mesg;
+  
+  exit($exit_code);
+}
