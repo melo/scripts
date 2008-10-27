@@ -1,0 +1,43 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Video::Info;
+
+my $file = $ARGV[0];
+print "Usage: x-video-info FILE\n" unless $file;
+
+my $video = Video::Info->new( -file => $file );
+die "Could not open file $file\n" unless $video;
+
+my $vcodec   = $video->vcodec;
+my $fps      = $video->fps;
+my $frames   = $video->vframes;
+my $duration = $video->duration;
+my $vrate    = $video->vrate / 8;
+
+my $width    = $video->width;
+my $height   = $video->height;
+
+my $hours = int($duration/3600);
+my $mins  = int(($duration-$hours*3600)/60);
+my $secs  = $duration-$hours*3600-$mins*60;
+
+my $acodec = $video->acodec;
+my $n_chan = $video->achans;
+my $rate   = $video->arate;
+my $freq   = $video->afrequency;
+
+$rate = $rate / 1024;
+$freq = $freq / 1000;
+
+printf(
+  'Video Codec: %s (%.2f FPS, duration %0.2i:%0.2i:%0.2i, size %i x %i, rate %i Kbps)%s',
+  $vcodec, $fps, $hours, $mins, $secs, $width, $height, $vrate, "\n",
+);
+
+printf(
+  'Audio Codec: %s (%i channels, at %i kbps, %i KHz)%s',
+  $acodec, $n_chan, $rate, $freq, "\n",
+);
+
