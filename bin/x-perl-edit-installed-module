@@ -2,7 +2,6 @@
 
 use strict;
 use warnings;
-use BSD::Resource;
 
 my $module = shift;
 usage(1) unless $module;
@@ -21,9 +20,6 @@ foreach my $inc (@INC) {
   my @paths = ($path);
   my $path_dir = "$inc/$module_dir";
   push @paths, $path_dir if -d $path_dir;
-  
-  my $ru = getrusage();
-  use Data::Dumper; print STDERR ">>>>>> ", Dumper($ru);
   
   exec($editor, @paths);
   die("Could not exec() '$editor': $!");
