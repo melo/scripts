@@ -1,0 +1,151 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Cwd;
+use File::Spec::Functions qw( splitdir catdir catfile );
+use JSON;
+use Getopt::Long;
+
+
+my %cfg;
+my $ok = GetOptions(
+  \%cfg,
+  "help",
+  "verbose+",
+  "quiet",
+);
+usage() unless $ok;
+usage() if $cfg{help};
+
+$cfg{root} ||= find_project_root();
+$cfg{verbose} ||= 0;
+$cfg{quiet} ||= 0;
+
+dispatch_command(\%cfg, @ARGV);
+
+
+sub dispatch_command {
+  my ($cfg, $cmd, @args) = @_;
+  
+  if (!defined($cmd)) {
+    usage();
+    return;
+  }
+  
+  load_cfg($cfg);
+
+  if ($cmd eq 'deploy') {
+    deploy($cfg, @args);
+  }
+  else {
+    usage("Command '$cmd' not understood");
+  }
+  
+  return
+}
+
+
+##########
+# Commands
+
+sub deploy {
+  my ($cfg, $env) = @_;
+  my $pcfg = $cfg->{project};
+  
+  usage('Deploy requires an environment as parameter')
+      unless defined $env;
+
+  usage("Environment '$env' not found in rules.prj")
+      unless exists $pcfg->{environments}{$env};
+  debug("Using environment '$env'");
+      
+  my $ecfg = $pcfg->{environments}{$env};
+  
+  my $rsync = $pcfg->{commands}{rsync} || 'rsync -a';
+  debug("Rsync command to use: $rsync");
+  
+  $rsync .= ' -v' if $cfg->{verbose} || $pcfg->{verbose};
+  $rsync .= " $cfg->{root}/";
+  $rsync .= " $ecfg->{user}\@$ecfg->{host}:$ecfg->{path}";
+  debug("Final rsync command: $rsync");
+  
+  system($rsync);
+  
+  return;
+}
+
+#######
+# Usage
+
+sub usage {
+  my ($msg) = @_;
+  
+  print STDERR <<EOU;
+Usage: prj COMMAND ARGS
+
+The current list of COMMANDs is:
+
+    deploy    deploys current version to an environment
+
+EOU
+
+  print STDERR "ERROR: $msg\n" if $msg;
+  exit(1);
+}
+
+
+########
+# Logger
+
+sub debug {
+  return if $cfg{quiet};
+  return unless $cfg{verbose} > 1;
+  
+  my $msg = join(' ', @_);
+  print STDERR "[DEBUG]: $msg\n";
+  return;
+}
+
+
+#######
+# Utils
+
+sub load_cfg {
+  my ($cfg) = @_;
+  my $root = $cfg->{root};
+  my $prj_cfg;
+  
+  if (open(my $fh, '<', catfile($root, 'rules.prj'))) {
+    local $/;
+    $prj_cfg = decode_json(<$fh>);
+    close($fh);
+  }
+  else {
+    die "Could not open 'rules.prj' file in $root: $!\n";
+  }
+  
+  $cfg->{project} = $prj_cfg;
+}
+
+sub find_project_root {
+	my $project_root;
+	
+	my @cwd = splitdir(getcwd());
+	do {
+		my $cwd = catdir(@cwd);
+		
+		if (-e catfile($cwd, 'rules.prj')) {
+			$project_root = $cwd;
+		}
+		elsif ($cwd eq $ENV{HOME} || scalar(@cwd) == 1) {
+			die "Could not find project root (was looking for rules.prj)\n";
+		}
+		else {
+			pop @cwd;
+		}
+	} while (!$project_root);
+	
+	return $project_root;
+}
+
