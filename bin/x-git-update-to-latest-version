@@ -55,7 +55,7 @@ echo
 
 make configure
 ./configure --prefix=$BASE/git-$version
-make all
+make -j6 all
 sudo make install
 
 
