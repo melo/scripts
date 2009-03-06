@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Updates local CPAN mirror
+#
+
+PATH=$PATH:/usr/local/bin
+export PATH
+
+minicpan $@
+
+# Notify end of update
+growlnotify -m - -s "CPAN Update" <<EOF
+O CPAN já foi actualizado direitinho...
+EOF
