@@ -3,29 +3,37 @@
 use strict;
 use warnings;
 
-my $module = shift;
-usage(1) unless $module;
-
-my $module_dir = $module;
-$module_dir =~ s/::/\//g;
-my $module_file = $module_dir.'.pm';
+my @modules = @ARGV;
+usage(1) unless @modules;
 
 my $editor = $ENV{EDITOR};
 usage(1, 'You must define the EDITOR environment') unless $editor;
 
-foreach my $inc (@INC) {
-  my $path = "$inc/$module_file";
-  next unless -e $path;
+my @paths;
+for my $module (@modules) {
+  my $module_dir = $module;
+  $module_dir =~ s/::/\//g;
+  my $module_file = $module_dir.'.pm';
   
-  my @paths = ($path);
-  my $path_dir = "$inc/$module_dir";
-  push @paths, $path_dir if -d $path_dir;
-  
+  foreach my $inc (@INC) {
+    my $path = "$inc/$module_file";
+    push @paths, $path if -e $path;
+
+    my $path_dir = "$inc/$module_dir";
+    push @paths, $path_dir if -d $path_dir;
+  }
+}
+
+if (@paths) {
   exec($editor, @paths);
   die("Could not exec() '$editor': $!");
 }
 
-print "Module '$module' not found in \@INC\n";
+print "Modules not found in \@INC:\n\n";
+foreach my $module (@modules) {
+  print "  * $module\n";
+}
+print "\n";
 exit(0);
 
 
@@ -33,7 +41,7 @@ sub usage {
   my ($exit_code, $mesg) = @_;
   
   print <<"  EOU";
-Usage: x-perl-edit-installed-module MODULE
+Usage: x-perl-edit-installed-module MODULE [MODULE]*
 
 Starts your \$EDITOR with the installed version of MODULE
   EOU
