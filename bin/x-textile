@@ -1,0 +1,8 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Text::Textile qw(textile);
+
+undef $/;
+print textile(scalar(<>));
