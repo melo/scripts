@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# Updates you stgit.git clone, recompiles, installs and activates the latest
+# version
+#
+
+# Set this to the place where stggit.git clone is at
+# in you local filesystem
+STGIT_CLONE_DIR=$HOME/work/track/stgit
+
+# Where all the git versions will be placed
+# Each version will be inside a directory, like v0.14.3-343-g0584ad1
+# Current active version will be a symblink 'stgit'
+# so you can add $BASE/stgit/bin to your PATH
+BASE=/usr/local
+
+### Nothing more to tweak ###
+
+cd $STGIT_CLONE_DIR
+if [ $? != 0 ] ; then
+	echo
+	echo "** FATAL **: could not chdir to STGIT_CLONE_DIR $GIT_CLONE_DIR"
+	echo "Edit this script and tell me where the stgit.git clone is"
+	exit 1
+fi
+
+echo
+echo "This script will pull the lastest stgit.git master branch, recompile,"
+echo "install and activate."
+echo
+echo "Sure? [y/N]"
+
+read confirmation
+
+if [ "$confirmation" != "y" ] ; then exit ; fi
+
+if [ -e configure ] ; then
+  make distclean
+fi
+
+make clean
+git fetch; git merge origin/master
+
+version=`git describe --always`
+
+if [ -d "$BASE/stgit-$version" ] ; then
+	echo
+	echo "**** You already have the latest stgit version ($version) installed"
+	echo
+	exit 0
+fi
+
+echo
+echo "******* Compiling version $version"
+echo
+
+stgit_prefix=/usr/local/stgit-$version
+
+# TODO: install asciidoc/xmlto to support docs
+make prefix=$stgit_prefix all
+sudo make prefix=$stgit_prefix install
+
+echo
+echo "******* Cleanup phase"
+echo
+
+make clean
+
+
+echo
+echo "******* Check environment"
+echo
+
+check_path=`echo $PATH | perl -pe 's/:/\n/g' | egrep ^$BASE/stgit/bin$`
+if [ -z "$check_path" ] ; then
+  echo
+  echo "WARNING: your PATH must be changed to include"
+  echo
+  echo "      $BASE/stgit/bin"
+  echo
+fi
+
+echo
+echo Current stgit version: `readlink $BASE/stgit`
+echo Switching to version: stgit-$version
+echo
+
+sudo sh -c "cd $BASE; rm -f stgit; ln -s stgit-$version stgit"
+
+echo
+echo "You are running verion (running stgit -v now):"
+echo
+stg --version
