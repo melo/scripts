@@ -56,13 +56,17 @@ echo
 make configure
 ./configure --prefix=$BASE/git-$version
 make -j6 all
+if [ $? != 0 ] ; then
+  echo "******* Compilation failed! "
+  exit 1
+fi
+
+
+echo
+echo "******* Installing git and documentation"
+echo
+
 sudo make install
-
-
-echo
-echo "******* Installing man pages"
-echo
-
 sudo make quick-install-doc
 
 
