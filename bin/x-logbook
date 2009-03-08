@@ -1,0 +1,5 @@
+#!/bin/sh
+
+host=`hostname -s`
+
+mate ~/Documents/work/personal/dotfiles/.logbook-${host}.md
