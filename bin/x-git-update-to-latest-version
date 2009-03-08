@@ -55,6 +55,7 @@ echo
 
 make configure
 ./configure --prefix=$BASE/git-$version
+unset PERL_MM_OPT
 make -j6 all
 if [ $? != 0 ] ; then
   echo "******* Compilation failed! "
