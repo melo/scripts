@@ -1,0 +1,79 @@
+#!/usr/bin/env perl
+
+package SAXY;
+
+use XML::LibXML;
+use XML::SAX::Base;
+use base qw(XML::SAX::Base);
+
+package main;
+
+use strict;
+use warnings;
+use XML::LibXML;
+use XML::Parser;
+use Benchmark qw( cmpthese );
+
+my $libxml = XML::LibXML->new();
+
+my $sax_handler = SAXY->new;
+my $libxml_sax = XML::LibXML->new(Handler => $sax_handler);
+
+my $expat = XML::Parser->new(
+  Handlers => {
+    Start => sub {},
+    End   => sub {},
+    Char  => sub {},
+  },
+);
+
+my $expat_no_hand = XML::Parser->new(
+  Handlers => {
+  },
+);
+
+my $expat_tree = XML::Parser->new( Style => 'Tree' );
+
+my $stanza = q{
+  <iq type="result" to="test" id="624-18" >
+  <query xmlns="http://jabber.org/protocol/disco#info">
+  <identity category="client" type="pc" name="Psi" />
+  <feature var="http://jabber.org/protocol/bytestreams" />
+  <feature var="http://jabber.org/protocol/si" />
+  <feature var="http://jabber.org/protocol/si/profile/file-transfer" />
+  <feature var="http://jabber.org/protocol/disco#info" />
+  <feature var="http://jabber.org/protocol/commands" />
+  <feature var="http://jabber.org/protocol/rosterx" />
+  <feature var="http://jabber.org/protocol/muc" />
+  <feature var="jabber:x:data" />
+  <feature var="http://jabber.org/protocol/chatstates" />
+  <feature var="http://jabber.org/protocol/mood+notify" />
+  <feature var="http://jabber.org/protocol/tune+notify" />
+  <feature var="http://jabber.org/protocol/physloc+notify" />
+  <feature var="http://jabber.org/protocol/geoloc+notify" />
+  <feature var="http://www.xmpp.org/extensions/xep-0084.html#ns-metadata+notify" />
+  <feature var="http://jabber.org/protocol/xhtml-im" />
+  </query>
+  </iq>
+};
+
+
+my $count = $ENV{COUNT} || 1000;
+
+cmpthese($count, {
+    'LibXML' => sub {
+      $libxml->parse_string($stanza);
+    },
+    'LibXML SAX' => sub {
+      $libxml_sax->parse_string($stanza);
+    },
+    'Expat (Tree)'  => sub {
+      $expat_tree->parse($stanza);
+    },
+    'Expat (SAX with handlers)'  => sub {
+      $expat->parse($stanza);
+    },
+    'Expat (SAX, no handlers)'  => sub {
+      $expat_no_hand->parse($stanza);
+    },
+});
