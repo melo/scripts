@@ -1,0 +1,45 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Mac::FSEvents;
+use IO::Select;
+
+if (!@ARGV) {
+  print STDERR <<'...';
+  Usage: x-test-continuous command_to_run
+
+    This utility watches the ./lib and ./t for modifications.
+    If any modification is detected, the command_to_run is executed
+
+    My usual use case is:
+
+      x-test-continuous prove -l -v t
+
+...
+
+  exit(1);
+}
+
+my @paths = ('./lib', './t');
+my %fh_map;
+my $sel = IO::Select->new;
+
+foreach my $path (@paths) {
+  my $fs = Mac::FSEvents->new({
+    path    => $path,
+    latency => 1.0,
+  });
+  my $fh = $fs->watch;
+  $sel->add($fh);
+  $fh_map{$fh} = $fs;
+}
+
+while (my @fhs = $sel->can_read) {
+  foreach my $fh (@fhs) {
+    my @events = $fh_map{$fh}->read_events;
+    system(@ARGV)
+  }
+}
+
+END { map { $_->stop } keys %fh_map }
