@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Clears the current terminal *including* scrollback
+#
+# Based on a script at http://codesnippets.joyent.com/tag/screen#post1738
+#
+
+osascript -e 'tell application "System Events" to tell process "Terminal" to keystroke "k" using command down'
+clear
