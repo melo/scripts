@@ -2,4 +2,4 @@
 
 host=`hostname -s`
 
-mate ~/Documents/work/personal/dotfiles/.logbook-${host}.md
+mate ~/Documents/work/personal/dotfiles/.logbook-${host}.md ~/Documents/work/personal/dotfiles/.logbook-*.md
