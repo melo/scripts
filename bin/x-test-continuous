@@ -4,22 +4,29 @@ use strict;
 use warnings;
 use Mac::FSEvents;
 use IO::Select;
+use Getopt::Long;
+use File::Spec::Functions qw( catfile );
+use File::HomeDir;
 
-if (!@ARGV) {
-  print STDERR <<'...';
-  Usage: x-test-continuous command_to_run
+my $once;
+my $script;
+my $ok = GetOptions(
+  'once'     => \$once,
+  'script=s' => \$script,
+);
+usage() unless $ok;
 
-    This utility watches the ./lib and ./t for modifications.
-    If any modification is detected, the command_to_run is executed
-
-    My usual use case is:
-
-      x-test-continuous prove -l -v t
-
-...
-
-  exit(1);
+my @args = @ARGV;
+if ($script) {
+  my $path = catfile(File::HomeDir->my_home, '.test-continuous.d', $script);
+  usage(1, "Script '~/.test-continuous.d/$script' not found or not executable")
+    unless -e $path && -x _;
+  unshift @args, $path;
 }
+
+usage(1, "A command_to_execute is required") unless @args;
+
+run_command(@args) if $once;
 
 my @paths = ('./lib', './t');
 my %fh_map;
@@ -38,8 +45,53 @@ foreach my $path (@paths) {
 while (my @fhs = $sel->can_read) {
   foreach my $fh (@fhs) {
     my @events = $fh_map{$fh}->read_events;
-    system(@ARGV)
+    run_command(@args);
   }
 }
 
+exit(0);
+
 END { map { $_->stop } keys %fh_map }
+
+
+### Run the command
+sub run_command {
+  system(@_);
+  print STDERR "Executed: ", join(' ', @_), "\n";
+}
+
+
+### Usage stuff
+sub usage {
+  my ($code, $mesg) = @_;
+  
+  print STDERR <<'...';
+Usage: x-test-continuous [--once|-o] [--script|-s=script_name] [command_to_run]
+
+  This utility watches the ./lib and ./t for modifications.
+  If any modification is detected, a command is executed.
+
+  The command can be given in two ways: using the --script NAME, or given the
+  command on the command line.
+
+  Options:
+  
+    --script NAME or -s NAME
+        executes ~/.test-continuous/NAME; exits if not found
+    --once
+        executes the command once before starting to watch the directories
+
+  My usual use case is:
+
+    x-test-continuous -- prove -l -v t
+
+  You need -- to split the arguments for this script and the
+  arguments for the command to execute.
+
+...
+
+  print STDERR "FATAL: $mesg\n\n" if $mesg;
+  
+  exit($code || 2);
+}
+
