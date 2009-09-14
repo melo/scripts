@@ -43,10 +43,11 @@ foreach my $path (@paths) {
 }
 
 while (my @fhs = $sel->can_read) {
+  my $count = 0;
   foreach my $fh (@fhs) {
-    my @events = $fh_map{$fh}->read_events;
-    run_command(@args);
+    $count += $fh_map{$fh}->read_events;
   }
+  run_command(@args) if $count;
 }
 
 exit(0);
