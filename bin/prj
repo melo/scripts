@@ -6,6 +6,7 @@ use Cwd;
 use File::Spec::Functions qw( splitdir catdir catfile );
 use JSON;
 use Getopt::Long;
+use Data::Dump ();
 
 
 my %cfg;
@@ -81,7 +82,7 @@ sub deploy {
 # Usage
 
 sub usage {
-  my ($msg) = @_;
+  my ($msg, @others) = @_;
   
   print STDERR <<EOU;
 Usage: prj COMMAND ARGS
@@ -93,6 +94,9 @@ The current list of COMMANDs is:
 EOU
 
   print STDERR "ERROR: $msg\n" if $msg;
+  foreach my $err (@others) {
+    print ' => ', $err, "\n";
+  }
   exit(1);
 }
 
@@ -104,11 +108,24 @@ sub debug {
   return if $cfg{quiet};
   return unless $cfg{verbose} > 1;
   
-  my $msg = join(' ', @_);
-  print STDERR "[DEBUG]: $msg\n";
-  return;
+  return _log('DEBUG', @_);  
 }
 
+sub fatal {
+  _log('FATAL', @_);  
+  exit(1);
+}
+
+sub _log {
+  my $tag = shift;
+  my $msg = join(' ', map { ref($_)? Data::Dump::pp($_) : $_ } @_);
+  
+  foreach my $line (split(/\n\r?/, $msg)) {
+    print STDERR "[$tag]: $line\n";
+  }
+
+  return;
+}
 
 #######
 # Utils
