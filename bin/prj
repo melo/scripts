@@ -54,27 +54,55 @@ sub dispatch_command {
 sub deploy {
   my ($cfg, $env) = @_;
   my $pcfg = $cfg->{project};
-  
-  usage('Deploy requires an environment as parameter')
-      unless defined $env;
 
-  usage("Environment '$env' not found in rules.prj")
-      unless exists $pcfg->{environments}{$env};
-  debug("Using environment '$env'");
-      
+  usage('Deploy requires an environment as parameter.',
+    'Valid values are: ' . join(', ', sort keys %{$pcfg->{environments}}))
+    unless defined $env;
+
+  ### Decide which environment to use
   my $ecfg = $pcfg->{environments}{$env};
+  usage("Environment '$env' not found in rules.prj") unless $ecfg;
+  debug("Using environment '$env'");
+
+  ### Prepare base rsync command to run
+  my $rsync = $pcfg->{commands}{rsync};
+  $rsync = [split(/\s+/, $rsync)] if $rsync && !ref($rsync);
+  $rsync ||= ['rsync', '-a'];
+
+  ### Include excludes
+  if (my $excl = $pcfg->{paths}{exclude}) {
+    $excl = [ $excl ] unless ref($excl) eq 'ARRAY';
+    push @$rsync, map { ('--exclude', $_) } @$excl;
+  }
   
-  my $rsync = $pcfg->{commands}{rsync} || 'rsync -a';
-  debug("Rsync command to use: $rsync");
-  
-  $rsync .= ' -v' if $cfg->{verbose} || $pcfg->{verbose};
-  $rsync .= ' -n' if $cfg->{dryrun};
-  $rsync .= " $cfg->{root}/";
-  $rsync .= " $ecfg->{user}\@$ecfg->{host}:$ecfg->{path}";
-  debug("Final rsync command: $rsync");
-  
-  system($rsync);
-  
+  ### Add common rsync options
+  push @$rsync, '-v' if $cfg->{verbose} || $pcfg->{verbose};
+  push @$rsync, '-n' if $cfg->{dryrun};
+  push @$rsync, "$cfg->{root}/";
+
+  ### Hosts to use
+  my @hosts = @{$ecfg->{hosts} || []};
+  push @hosts, $ecfg if $ecfg->{host};
+  fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg") unless @hosts;
+
+  ### rsync to each one
+  foreach my $host (@hosts) {
+    fatal("Env '$env' with missing 'host'") unless $host->{host};
+
+    my @cmd = @$rsync;
+
+    ### prepare the SSH transport settings
+    push @cmd, '-e', 'ssh';
+    $cmd[-1] .= " -l $host->{user}" if $host->{user};
+    $cmd[-1] .= " -p $host->{port}" if $host->{port};
+
+    push @cmd, join(':', $host->{host}, ($host->{path} || $ecfg->{path}));
+
+    debug('Rsync command to use:', \@cmd);
+
+    system(@cmd) unless $cfg{dryrun};
+  }
+
   return;
 }
 
