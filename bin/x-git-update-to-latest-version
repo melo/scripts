@@ -24,6 +24,13 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
+# Allow for -t to force a make test
+# I should learn to use getopt with sh really
+run_tests=
+if [ "$1" == "-t" ] ; then
+  run_tests=yes
+fi
+
 echo
 echo "This script will pull the lastest git.git master branch, recompile,"
 echo "install and activate."
@@ -62,6 +69,13 @@ if [ $? != 0 ] ; then
   exit 1
 fi
 
+if [ "$run_tests" == "yes" ] ; then
+  echo
+  echo "******* Installing git and documentation"
+  echo
+  
+  make test
+fi
 
 echo
 echo "******* Installing git and documentation"
