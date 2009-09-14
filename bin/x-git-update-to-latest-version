@@ -6,7 +6,7 @@
 
 # Set this to the place where git.git clone is at
 # in you local filesystem
-GIT_CLONE_DIR=$HOME/work/track/git
+GIT_CLONE_DIR=$HOME/Documents/work/track/git
 
 # Where all the git versions will be placed
 # Each version will be inside a directory, like git-v1.5.6.1-204-g6991357
