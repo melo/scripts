@@ -1,0 +1,191 @@
+#!/usr/bin/env perl
+#
+# ** Send queued test reports **
+#
+# I like to use CPAN::Reporter, but the default behavior of sending the
+# reports during my cpan runs is very slow.
+#
+# Fortunately, you can configure CPAN::Reporter to write the reports to
+# a directory, and later send them all in a batch.
+#
+# First you need to configure your CPAN::Reporter. Create a
+# $HOME/.cpanreporter/ directory and place a config.ini file inside with
+# the following content:
+# 
+# ---- 8< ------
+# email_from = melo@simplicidade.org
+# edit_report = no
+#
+# transport=File $QUEUE_DIR
+# ---- 8< ------
+# 
+# Adjust the email_from field to use your email, and adjust the
+# $QUEUE_DIR directory path in the last line.
+# 
+# I use `/Users/melo/.cpan/reports` as my $QUEUE_DIR, for example.
+# 
+# **Make sure the directory exists**
+# 
+#    $ mkdir -p /Users/melo/.cpan/reports
+# 
+# Then make sure your cpan command is configured to use CPAN::Reporter. The easiest way is:
+# 
+#    $ cpan
+#    cpan> o conf test_report 1
+#    cpan> o conf commit
+#    cpan> quit
+# 
+# Done! You can now install your modules and a report will be created in
+# the $QUEUE_DIR directory
+#
+# After you create your reports, you can send them later with this script. Just run:
+# 
+#     $ x-perl-send-test-reports $QUEUE_DIR
+# 
+# Reports will be renamed to .done after they are send. You can run the
+# script with --clean to remove those files.
+#  
+
+use strict;
+use warnings;
+use 5.10.0;
+use Test::Reporter;
+use Getopt::Long;
+use Path::Class qw( dir );
+
+my $opt_clean;
+my $opt_from;
+my $opt_server;
+my $opt_transport;
+
+my @queues = parse_arguments();
+scan_all_queues(@queues);
+
+sub send_report {
+  my ($file) = @_;
+  
+  my $tr = Test::Reporter->new;
+  $tr->from($opt_from);
+  $tr->mx([ $opt_server ]);
+  $tr->transport(split(/\s+/, $opt_transport));
+  $tr->via( 'x-perl-send-test-reports v0.1');
+
+  return if $tr->read($file)->send;
+  return $tr->errstr;
+}
+
+sub send_reports_in_queue {
+  my $q = shift;
+  
+  scan_queue($q, qr{[.]rpt$}, sub {
+    my ($file) = @_;
+    local $| = 1;
+    
+    my $subject = find_subject($file);
+    next unless $subject;
+    
+    print "Sending report for '$subject'... ";
+    if (my $error = send_report($file)) {
+      print "FAIL\n>> Error: $error\n";
+    }
+    else {
+      if (rename($file, "$file.done")) {
+        print "done!\n";
+      }
+      else {
+        print "FAIL\n>>> Could not mark '$subject' as DONE, will be resent.\n";
+      }
+    }
+  });
+}
+
+sub scan_all_queues {
+  for my $q (@_) {
+    send_reports_in_queue($q);
+    clean_reports_in_queue($q) if $opt_clean;
+  }
+}
+
+sub clean_reports_in_queue {
+  my ($q) = @_;
+  
+  scan_queue($q, qr{[.]done$}, sub {
+    $_->remove && print "Cleaned up '$_'\n";
+  });
+}
+
+sub scan_queue {
+  my ($q, $regexp, $cb) = @_;
+  
+  ITEM: while (my $item = $q->next) {
+    next ITEM unless -f $item;
+    local $_ = $item;
+    $cb->($item) if $item =~ /$regexp/;
+  }
+}
+
+sub find_subject {
+  my ($rpt) = @_;
+  my $subject;
+  
+  my $fh = $rpt->openr;
+  for (1..5) {
+    my $line = <$fh>;
+    last unless $line;
+    
+    $subject = $1 if $line =~ m/^Subject:\s*(.+)/;
+    last if $subject;
+  }
+  $fh->close;
+  
+  return $subject;
+}
+
+sub parse_arguments {
+  GetOptions(
+    "from=s"      => \$opt_from,
+    "server=s"    => \$opt_server,
+    "transport=s" => \$opt_transport,
+    "clean"       => \$opt_clean,
+  ) || usage();
+
+  usage('missing queue directory') unless @ARGV;
+  usage('parameter --from is required') unless $opt_from;
+  usage('parameter --server is required') unless $opt_server;
+  
+  for my $q (@ARGV) {
+    usage("queue '$q' is not a directory") unless -d $q;
+    $q = dir($q);
+  }
+  
+  return @ARGV;
+}
+
+sub usage {
+  my $mesg = join('', @_);
+  
+  print <<'USAGE';
+Send test reports created with CPAN::Reporter.
+
+  Usage: x-perl-send-test-reports options queue1 ...
+
+  Options:
+
+    --from        Email FROM address
+    --server      SMTP server to use
+    --transport   Tweak transport to use
+    --clean       Remove reports that where sent sucessfully
+
+Example: to send test reports via the GMail server:
+
+  x-perl-send-test-reports --from your@email --server smtp.gmail.com \
+    --transport "Net::SMTP::TLS User your@email Password your_gmail_password Port 587" \
+    ~/.cpan/reports
+
+USAGE
+  
+  print "\nFATAL: $mesg\n" if $mesg;
+  
+  exit(1);
+}
+
