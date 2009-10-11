@@ -1,0 +1,114 @@
+#!/bin/sh
+#
+# Keeps a intg branch with all the f-* branches
+#
+
+## Make sure we are in the root of the repo
+if [ ! -d .git ] ; then
+  echo
+  echo "FATAL: this is not the root of the repository"
+  echo
+  exit 1
+fi
+
+## Make sure we are clean
+clean_marker="nothing to commit (working directory clean)"
+is_clean=`git status | grep "$clean_marker"`
+if [ "$is_clean" != "$clean_marker" ] ; then
+  echo
+  echo "FATAL: this repo has unfinished business. Run:"
+  echo
+  echo "    git status"
+  echo
+  echo "to check whats up."
+  echo
+  exit 1
+fi
+
+intg_marker=.this_is_the_intg_branch
+
+## Deal with --create
+if [ "$1" == "--create" ] ; then
+  haz_intg=`git branch | cut -c3- | egrep "^intg$"`
+  if [ ! -z "$haz_intg" ] ; then
+    echo "FATAL: you already have a 'intg' branch"
+    exit 1
+  fi
+  
+  git checkout -b intg ${3:master}
+  touch $intg_marker
+  git add $intg_marker
+  git ci -m 'Mark this branch as intg' $intg_marker
+  echo "Done! You can start your integration now. Run:"
+  echo
+  echo "    git intg"
+  echo
+  exit 0
+fi
+
+## If a parameter is given, assume it is the desired intg branch
+if [ -n "$1" ] ; then
+  git checkout $1
+fi
+
+## Make sure this is a intg branch
+if [ ! -e $intg_marker ] ; then
+  cat <<EOM
+
+**** This is not the branch you are looking for... ****
+
+Switch to the intg branch and try again. Try:
+
+    git checkout intg
+
+If you don't have a 'intg' branch, create one with:
+
+    git intg --create [source_branch]
+
+The 'source_branch' is 'master' by default.
+
+EOM
+  exit 1
+fi
+
+
+## Reset previous intg branch
+merge_commit=`head -1 .this_is_the_intg_branch`
+if [ -n "$merge_commit" ] ; then
+  echo "Merge commit is $merge_commit, reseting last intg merge"
+  git reset --hard $merge_commit
+fi
+
+echo ">>> Record intg merge to reset later"
+git show --pretty=format:%H --quiet > $intg_marker
+git commit -m 'intg marker updated with reset commit' $intg_marker
+
+## Create the branch and be happy
+branch_to_merge=`git branch | cut -c3- | egrep ^f- | sort`
+echo "Creating 'intg' branch from: $branch_to_merge"
+git merge --no-ff $branch_to_merge
+
+
+## Warn about conflits and stuff
+is_clean=`git status | grep "$clean_marker"`
+if [ "$is_clean" != "$clean_marker" ] ; then
+  cat <<EOM
+
+!!!!!!! YOU ARE A WINNER -- Conflits !!!!!!!
+
+Yes, its right, you won... You have conflits to solve. Oh the joy!
+
+You should probably see which branches have the conflict and rebase one
+of them into the other.
+
+Then rename the child branch so that it sorts after the parent branch.
+
+You can clear up this whole mess with:
+
+    git reset --hard
+
+EOM
+  exit 1
+fi
+
+echo "Done! Enjoy your integration branch"
