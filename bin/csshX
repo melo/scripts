@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 #==============================================================================#
 # csshX -- Cluster SSH tool for MacOS-X Termial.app                            #
