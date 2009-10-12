@@ -4,12 +4,14 @@
 #
 
 use strict;
+use warnings;
 use Config::Any;
-use Data::Dump qw( dump );
+use Data::Dump qw( pp );
 
 my $cfg = Config::Any->load_files({ files => \@ARGV, use_ext => 1 });
 
 for (@$cfg) {
   my ($filename, $config) = each %$_;
-  print "Got configuration from file '$filename':\n", dump($config), "\n";
+  print "Got configuration from file '$filename':\n", pp($config), "\n";
 }
+
