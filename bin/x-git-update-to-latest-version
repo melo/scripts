@@ -16,6 +16,11 @@ BASE=/usr/local
 
 ### Nothing more to tweak ###
 
+## local::lib installs might mess up with /usr/bin/perl
+## if you have another perl on your path
+unset PERL_MM_OPT
+unset PERL5LIB
+
 cd $GIT_CLONE_DIR
 if [ $? != 0 ] ; then
 	echo
@@ -62,7 +67,6 @@ echo
 
 make configure
 ./configure --prefix=$BASE/git-$version
-unset PERL_MM_OPT
 make -j6 all
 if [ $? != 0 ] ; then
   echo "******* Compilation failed! "
