@@ -7,12 +7,51 @@ use strict;
 use warnings;
 use Config::Any;
 use Data::Dump qw( pp );
+use Getopt::Long;
 
-my $cfg = Config::Any->load_files({ files => \@ARGV, use_ext => 1 });
+my $opt_json;
+GetOptions('json' => \$opt_json) || usage();
+
+if ($opt_json) {
+  eval { require JSON };
+  fatal("option --json requires the JSON module from CPAN") if $@;
+}
+
+usage('Missing required configuration file to parse') unless @ARGV;
+
+my $cfg = Config::Any->load_files({files => \@ARGV, use_ext => 1});
 
 for my $c (@$cfg) {
   while (my ($filename, $config) = each %$c) {
-    print "Got configuration from file '$filename':\n", pp($config), "\n";
+    print ">>> Got configuration from file '$filename':\n";
+
+    if ($opt_json) { print JSON::to_json($config) }
+    else           { print pp($config)            }
+
+    print "\n";
   }
 }
 
+
+#############
+
+sub fatal {
+  my $mesg = join('', @_);
+  
+  print "FATAL: $mesg\n" if $mesg;
+  exit(1);
+}
+
+sub usage {
+  print <<"  EOU";
+
+Usage: x-perl-check-config [--json] config_file*
+
+Parses 1 or more configuration files (JSON, .ini, YAML supported)
+and dumps the internal perl structure or as JSON if the '--json'
+option is used.
+
+  EOU
+  
+  fatal(@_);
+}
