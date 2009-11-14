@@ -65,6 +65,9 @@ echo
 echo "******* Compiling version $version"
 echo
 
+PERL_PATH="/usr/bin/env perl"
+export PERL_PATH
+
 make configure
 ./configure --prefix=$BASE/git-$version
 make -j6 all
