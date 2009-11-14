@@ -1,0 +1,18 @@
+#!/bin/sh
+
+workdir=`mktemp -d -t my-perl-update-process`
+if [ ! -d "$workdir" ] ; then
+  echo "Could not create temporary work directory: $!"
+  exit 1
+fi
+cd $workdir
+
+minicpan
+git clone git://github.com/melo/my-perl-bootstrap.git bootstrap
+cd bootstrap && ./update_deps.sh
+
+for dir in "$HOME/.perl5" "$HOME/perl5" ; do
+  if [ -d "$dir" -a -d "$dir/.git" ] ; then
+    cd "$dir" && git add . && git commit -s -m "Automatic update"
+  fi
+done
