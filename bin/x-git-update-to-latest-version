@@ -54,7 +54,7 @@ git pull
 
 version=`git describe --always`
 
-if [ -d "$BASE/git-$version" ] ; then
+if [ -z "$DOIT" -a -d "$BASE/git-$version" ] ; then
 	echo
 	echo "**** You already have the latest git version ($version) installed"
 	echo
