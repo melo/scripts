@@ -1,0 +1,63 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+open(my $ioreg, '-|', 'ioreg -l');
+
+my $found = 0;
+my %info;
+
+while (<$ioreg>) {
+  chomp;
+  if (!$found) {
+	$found++ if /AppleSmartBattery  <class AppleSmartBattery/;
+	next;
+  }
+
+  if (/"([^"]+)"\s*=\s*{(.+)}/) {
+	my $name = $1;
+	my $attr = $2;
+	my %data = $attr =~ /"([^"]+)"\s*=\s*"?([^",]+)"?/g;
+	$info{$name} = \%data;
+	next;
+  }
+  
+  if (/"([^"]+)"\s*=\s*"?([^"+]+)"?/) {
+	$info{$1} = $2;
+	next;
+  }
+  
+  last if /^(\s*[|])+\s*}$/;
+}
+
+my $logfile = "$ENV{HOME}/.battery.log";
+open(my $log, '>>', $logfile)
+  || die("Could not open log file '$logfile': $!\n");
+
+my $now = time;
+print $log "t:$now # ".localtime($now)."\n";
+
+my @keys = qw(
+  FullyCharged IsCharging ExternalConnected
+  CycleCount
+  TimeRemaining
+  MaxCapacity Voltage CurrentCapacity DesignCapacity
+  Temperature
+);
+
+foreach my $key (@keys) {
+  my $new_key = $key;
+  $new_key =~ s/([a-z])([A-Z])/${1}_${2}/g;
+  $new_key = lc($new_key);
+  
+  my $value = $info{$key};
+  next unless defined $value;
+  
+  print $log "$new_key: $value\n";
+}
+
+print $log "\n";
+
+close($log);
+
