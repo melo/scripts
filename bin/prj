@@ -90,6 +90,9 @@ sub deploy {
     _tag_release($env);
   }
 
+  ### Describe the current release
+  system('git describe --always > .release');
+
   ### rsync to each one
   foreach my $host (@hosts) {
     fatal("Env '$env' with missing 'host'") unless $host->{host};
@@ -108,6 +111,7 @@ sub deploy {
     system(@cmd) unless $cfg{dryrun};
   }
 
+  unlink('.release');
   return;
 }
 
