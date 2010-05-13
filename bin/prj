@@ -7,7 +7,7 @@ use File::Spec::Functions qw( splitdir catdir catfile );
 use JSON;
 use Getopt::Long;
 use Data::Dump ();
-
+use DateTime;
 
 my %cfg;
 my $ok = GetOptions(
@@ -84,6 +84,11 @@ sub deploy {
   my @hosts = @{$ecfg->{hosts} || []};
   push @hosts, $ecfg if $ecfg->{host};
   fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg") unless @hosts;
+
+  ### Check for tags
+  if ($ecfg->{tag}) {
+    _tag_release($env);
+  }
 
   ### rsync to each one
   foreach my $host (@hosts) {
@@ -196,3 +201,15 @@ sub find_project_root {
 	return $project_root;
 }
 
+
+############
+# Operations
+
+sub _tag_release {
+  my ($env) = @_;
+  
+  my $now = DateTime->now;
+  my $tag = join('-', 'release', $env, $now->ymd('').$now->hms(''));
+
+  return system('git', 'tag', $tag);
+}
