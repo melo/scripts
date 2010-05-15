@@ -91,7 +91,7 @@ sub deploy {
   }
 
   ### Describe the current release
-  system('git describe --always > .release');
+  system('git describe --always --tags > .release');
 
   ### rsync to each one
   foreach my $host (@hosts) {
