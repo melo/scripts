@@ -66,7 +66,7 @@ sub send_report {
   
   my $tr = Test::Reporter->new;
   $tr->from($opt_from);
-  $tr->mx([ $opt_server ]);
+  $tr->mx([ $opt_server ]) if $opt_server; 
   $tr->transport(split(/\s+/, $opt_transport));
   $tr->via( 'x-perl-send-test-reports v0.1');
 
@@ -151,7 +151,7 @@ sub parse_arguments {
 
   usage('missing queue directory') unless @ARGV;
   usage('parameter --from is required') unless $opt_from;
-  usage('parameter --server is required') unless $opt_server;
+#  usage('parameter --server is required') unless $opt_server;
   
   for my $q (@ARGV) {
     usage("queue '$q' is not a directory") unless -d $q;
