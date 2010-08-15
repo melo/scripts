@@ -12,12 +12,14 @@ my $host;
 my $user;
 my $pwd = $ENV{MYSQL_PASSWORD};
 my $askpass;
+my $count;
 
 my $ok = GetOptions(
   "host=s", \$host,
   "user=s", \$user,
   "password=s", \$pwd,
   "askpass", \$askpass,
+  "count", \$count,
 );
 
 usage() if !$ok;
@@ -67,13 +69,16 @@ sub check_table {
     qq{ CHECK TABLE $table },
     { Slice => {} },
   );
-  
+  my $rows;
+  ($rows) = $dbh->selectrow_array(qq{ SELECT COUNT(*) FROM $table })
+    if $count;
+
   if (@$result == 1 && is_ok($result->[0])) {
-    print "  $table: is OK\n";
+    print "  $table".(defined $rows? "($rows)" : '').": is OK\n";
     return;
   }
   
-  print "\n  $table:\n";
+  print "\n  $table".(defined $rows? "($rows)" : '').":\n";
   foreach my $row (@$result) {
     print "      $row->{Op}: $row->{Msg_type} => '$row->{Msg_text}'\n";
     print "  ** Table is OK **\n" if is_ok($row);
