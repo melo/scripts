@@ -121,7 +121,7 @@ sub deploy {
 
   unlink('.release');
   
-  notify("Deployed '$env' for project '$pname'") unless $cfg{dryrun};
+  notify("Deployed '$env' for project '$pname' OK") unless $cfg{dryrun};
   return;
 }
 
@@ -219,7 +219,7 @@ sub find_project_root {
 sub notify {
   my ($message) = @_;
 
-  system('growlnotify', '-m', $message, '-s', 'prj deploy status');
+  system('growlnotify', '-m', $message, 'prj deploy status');
 }
 
 
