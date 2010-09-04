@@ -54,6 +54,7 @@ sub dispatch_command {
 sub deploy {
   my ($cfg, $env) = @_;
   my $pcfg = $cfg->{project};
+  my $pname = $pcfg->{project}{name} || (find_project_root())[-1];
 
   usage('Deploy requires an environment as parameter.',
     'Valid values are: ' . join(', ', sort keys %{$pcfg->{environments}}))
@@ -119,6 +120,8 @@ sub deploy {
   }
 
   unlink('.release');
+  
+  notify("Deployed '$env' for project '$pname'") unless $cfg{dryrun};
   return;
 }
 
@@ -209,7 +212,14 @@ sub find_project_root {
 		}
 	} while (!$project_root);
 	
+	return @cwd if wantarray;
 	return $project_root;
+}
+
+sub notify {
+  my ($message) = @_;
+
+  system('growlnotify', '-m', $message, '-s', 'prj deploy status');
 }
 
 
