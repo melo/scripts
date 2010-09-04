@@ -85,6 +85,13 @@ sub deploy {
   push @hosts, $ecfg if $ecfg->{host};
   fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg") unless @hosts;
 
+  ### Check for proper branch
+  if (my $branch_name = $ecfg->{branch}) {
+    my $cur_branch = _current_branch_name();
+    fatal("Current branch '$cur_branch' not the expected one '$branch_name")
+      unless $cur_branch eq $branch_name;
+  }
+
   ### Check for tags
   if ($ecfg->{tag}) {
     _tag_release($env);
@@ -216,4 +223,11 @@ sub _tag_release {
   my $tag = join('-', 'release', $env, $now->ymd('').$now->hms(''));
 
   return system('git', 'tag', $tag);
+}
+
+sub _current_branch_name {
+  my $cur_tag = `git name-rev --always --name-only HEAD`;
+  chomp $cur_tag;
+  
+  return $cur_tag;
 }
