@@ -23,7 +23,22 @@ sub fetch {
 }
 
 sub usage {
-  print STDERR "Usage: fetch.pl -u <user> -p <password> episode+\n";
+  print STDERR <<EOUSAGE;
+Usage: fetch.pl -u <user> -p <password> episode+
+
+Don't forget to create a ~/.tvshows_rc file like this:
+
+------- 8< ------------
+#
+# Access to my TV service
+#
+
+host my.tvservice.host.here
+user my_username
+password my_password
+------- 8< ------------
+EOUSAGE
+
   exit(shift || 1);
 }
 
