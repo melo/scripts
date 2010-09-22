@@ -8,8 +8,8 @@ fi
 cd $workdir
 
 minicpan
-git clone git://github.com/melo/my-perl-bootstrap.git bootstrap
-cd bootstrap && ./update_deps.sh
+git clone -b build/master git://github.com/melo/task-belike-melo.git bootstrap
+cd bootstrap && cpanm .
 
 for dir in "$HOME/.perl5" "$HOME/perl5" ; do
   if [ -d "$dir" -a -d "$dir/.git" ] ; then
