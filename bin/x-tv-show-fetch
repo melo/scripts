@@ -10,7 +10,7 @@ GetOptions(\%opts, 'user=s', 'password=s') or usage(2);
 usage() unless $opts{user} && $opts{password} && $opts{password};
 usage() unless @ARGV;
 
-my $base = "http://$opts{host}/series";
+my $base = "http://$opts{user}:$opts{password}\@$opts{host}/series";
 
 for my $e (@ARGV) {
   my ($show, $season) = $e =~ m/(.+)-(\d+)x/;
@@ -18,20 +18,8 @@ for my $e (@ARGV) {
   fetch($e, "$base/$show/season_$season/$e");
 }
 
-
 sub fetch {
-  my ($file, $url) = @_;
-  my $fh;
-
-  my $ua = LWP::UserAgent->new;
-  $ua->env_proxy;
-  $ua->credentials("$opts{host}:80", 'Series TV', $opts{user}, $opts{password});
-  $ua->from($opts{email}) if $opts{email};
-  $ua->show_progress(1);
-
-  my $res = $ua->mirror($url, $file);
-  print STDERR "ERROR: failed '$url' - " . $res->status_line . "\n"
-    unless $res->is_success;
+  system(qw(curl -L -C - -O ), pop);
 }
 
 sub usage {
