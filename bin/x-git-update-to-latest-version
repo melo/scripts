@@ -97,6 +97,7 @@ echo "******* Cleanup phase"
 echo
 
 make distclean
+git gc
 
 
 echo
