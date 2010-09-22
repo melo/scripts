@@ -99,6 +99,7 @@ sub deploy {
   }
 
   ### Describe the current release
+  END { unlink('.release') }
   system('git describe --always --tags > .release');
 
   ### rsync to each one
@@ -119,8 +120,6 @@ sub deploy {
     system(@cmd) unless $cfg{dryrun};
   }
 
-  unlink('.release');
-  
   notify("Deployed '$env' for project '$pname' OK") unless $cfg{dryrun};
   return;
 }
