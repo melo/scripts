@@ -115,9 +115,19 @@ sub deploy {
 
     push @cmd, join(':', $host->{host}, ($host->{path} || $ecfg->{path}));
 
-    debug('Rsync command to use:', \@cmd);
-
+    debug('Rsync command:', \@cmd);
     system(@cmd) unless $cfg{dryrun};
+    
+    if (exists $ecfg->{post_deploy}) {
+      @cmd = ('ssh', $host->{host});
+      push(@cmd, '-v') if $cfg->{verbose} || $pcfg->{verbose};
+      push(@cmd, '-l', $host->{user}) if $host->{user};
+      push(@cmd, '-p', $host->{port}) if $host->{port};
+      push @cmd, "cd ".($host->{path} || $ecfg->{path})." && $ecfg->{post_deploy}";
+      
+      debug('Post deploy command:', \@cmd);
+      system(@cmd) unless $cfg{dryrun};
+    }
   }
 
   notify("Deployed '$env' for project '$pname' OK") unless $cfg{dryrun};
