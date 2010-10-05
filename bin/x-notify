@@ -34,19 +34,24 @@ else
 fi
 
 # decide which notifier we have
+which x-web-notify > /dev/null
+has_notifo=$?
 env growlnotify -h > /dev/null 2> /dev/null
 has_growl=$?
 env notify-send -? > /dev/null 2> /dev/null
 has_libnotify=$?
 
 # notify the user, growl or libnotify
-if [ "$has_growl" == "0" ] ; then
+if [ "$has_notifo" == 0 ] ; then
+  x-web-notify "Script completed ($result): $@"
+elif [ "$has_growl" == "0" ] ; then
     growlnotify -m "Script '$@' $result" -s "Background script notification" &
 elif [ "$has_libnotify" == "0" ] ; then
     notify-send "Script '$@' $result" "Background script notification" &
 else
   echo no notitifer...
 fi
+
 
 # exit with the original status
 exit $status
