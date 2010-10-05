@@ -228,7 +228,25 @@ sub find_project_root {
 sub notify {
   my ($message) = @_;
 
-  system('growlnotify', '-m', $message, 'prj deploy status');
+  if (my $notifo = _has_cmd('x-web-notify')) {
+    system($notifo, $message);
+  }
+  elsif (my $gn = _has_cmd('growlnotify')) {
+    system($gn, '-m', $message, 'prj deploy status');
+  }
+
+  return;
+}
+
+sub _has_cmd {
+  my ($cmd) = @_;
+
+  for my $path (split(/:/, $ENV{PATH})) {
+    my $fn = catfile($path, $cmd);
+    return $fn if -x $fn;
+  }
+
+  return;
 }
 
 
