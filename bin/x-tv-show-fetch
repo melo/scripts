@@ -59,8 +59,6 @@ sub load_config {
     my ($command, $value) = $l =~ /^(\S+)(?:\s+(.+))?$/;
     die "Unparseable line $. on $file: $l\n" unless $command;
     
-    print "'$command' '$value' via '$l'\n";
-
     $value = '' unless defined $value;
     $value =~ s/^(["'])(.*)\1$/$2/;
 
