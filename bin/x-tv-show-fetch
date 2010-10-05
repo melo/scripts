@@ -12,6 +12,9 @@ usage() unless @ARGV;
 
 my $base = "http://$opts{user}:$opts{password}\@$opts{host}/series";
 
+@ARGV = grep { $_ } map { s/^\s+|\s+$//g; $_ } grep { /^[^#]/ } <STDIN>
+  if $ARGV[0] eq '-';
+
 for my $e (@ARGV) {
   my ($show, $season) = $e =~ m/(.+)-(\d+)x/;
 
