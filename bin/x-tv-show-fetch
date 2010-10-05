@@ -22,7 +22,8 @@ for my $e (@ARGV) {
 }
 
 sub fetch {
-  system(qw(curl -L -C - -O ), pop);
+  print "\n*** Fetching $_[-1]\n";
+  system(qw(curl -L -C - -O ), $_[-1]);
 }
 
 sub usage {
