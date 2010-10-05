@@ -1,0 +1,62 @@
+#!/usr/bin/env perl
+#
+# x-watch-load: Sound the bell if the load levels rise above defined levels
+#
+# Pedro Melo <melo@simplicidade.org> (c) 2010
+#
+# Licensed in the terms of the Artistic License 2.0
+# See http://www.opensource.org/licenses/artistic-license-2.0.php
+#
+
+use strict;
+use warnings;
+
+my (@levels) = @ARGV;
+usage(1) unless @levels;
+
+$|++;
+while (1) {
+  my @load = _read_uptime();
+  die "FATAL: Format of uptime unkown\n" unless @load;
+
+  my $count = 0;
+  for my $level (@levels) {
+    $count++ if $load[0] > $level;
+  }
+
+  print "\rLoad average: ", join(', ', @load), '  ';
+  print "\a" while $count--;
+  sleep(2);
+}
+
+
+sub _read_uptime {
+  my $uptime = `uptime`;
+  return ($uptime =~ m/\s+([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)$/);
+}
+
+
+sub usage {
+  print <<EOU;
+
+Usage: x-watch-load level1 [level2...levelN]
+
+  Sound the bell if the load levels rise above defined levels. Load is
+  sampled every second.
+
+  For example:
+
+      x-watch-load .1 .5 1 2
+
+  if load is .4, only .1 is matched and a single sound is played.
+  But if load is 1.1, then three levels are matched and three sounds
+  are played.
+
+  Pedro Melo <melo\@simplicidade.org> (C) 2010
+
+  LICENSE: Artistic License 2.0,
+  see http://www.opensource.org/licenses/artistic-license-2.0.php
+
+EOU
+  exit(1);
+}
