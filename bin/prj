@@ -130,7 +130,7 @@ sub deploy {
     }
   }
 
-  notify("Deployed '$env' for project '$pname' OK") unless $cfg{dryrun};
+  notify("Sucessfully deployed '$env' for project '$pname'", $pname, $env) unless $cfg{dryrun};
   return;
 }
 
@@ -226,10 +226,12 @@ sub find_project_root {
 }
 
 sub notify {
-  my ($message) = @_;
+  my ($message, $proj, $env) = @_;
 
-  if (my $notifo = _has_cmd('x-web-notify')) {
-    system($notifo, $message);
+  eval { require WebService::Notifo };
+  if (!$@) {
+    my $n = WebService::Notifo->new;
+    $n->send_notification( label => 'prj', title => "$proj ($env)", msg => $message);
   }
   elsif (my $gn = _has_cmd('growlnotify')) {
     system($gn, '-m', $message, 'prj deploy status');
