@@ -28,13 +28,13 @@ status=$?
 
 # decide which status to use
 if [ "$status" == "0" ] ; then
-    result="completed"
+    result="success"
 else
     result="FAILED ($status)"
 fi
 
 # decide which notifier we have
-which x-web-notify > /dev/null
+which notifo > /dev/null
 has_notifo=$?
 env growlnotify -h > /dev/null 2> /dev/null
 has_growl=$?
@@ -43,7 +43,7 @@ has_libnotify=$?
 
 # notify the user, growl or libnotify
 if [ "$has_notifo" == 0 ] ; then
-  x-web-notify "Script completed ($result): $@"
+  notifo --label x-notify "Script completed ($result): $@"
 elif [ "$has_growl" == "0" ] ; then
     growlnotify -m "Script '$@' $result" -s "Background script notification" &
 elif [ "$has_libnotify" == "0" ] ; then
