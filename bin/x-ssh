@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Make sure we have a ssh master process before starting our own ssh
+#
+# Inspired by http://blog.woobling.org/2010/10/headless-virtualbox.html
+#
+# Forward configuration is only applied once, on the master process
+#
+# Suggestion: alias ssh=x-ssh
+#
+
+
+function usage ()
+{
+  echo "Usage: x-ssh host [other options]"
+  echo ""
+  echo "  NOTE WELL: for now, the destination host must be the first option"
+  exit 1
+}
+
+host=$1
+if [ -z "$host" ] ; then
+  usage
+fi
+
+config=$HOME/.ssh/config
+if [ ! -r "$config" ] ; then
+  echo "Fatal: requires a ~/.ssh/config file"
+  exit 1
+fi
+
+grep -q "Host ${host}" "$config"
+if [ $? == 1 ] ; then
+  echo "Fatal: could not find config for $host in $config";
+  exit 1
+fi
+
+ssh -q -O check "$host" >/dev/null 2>&1
+if [ $? == 255 ] ; then
+  ssh -N -f -q -o ClearAllForwardings=no -o ControlMaster=yes "$host"
+fi
+
+ssh -o ClearAllForwardings=yes $@
