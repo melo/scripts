@@ -8,36 +8,40 @@
 #
 # Suggestion: alias ssh=x-ssh
 #
-
+# Example configuration on .ssh/config:
+#
+#     Host e-stage
+#       HostName staging.host.name
+#       User melo
+#       ForwardAgent yes
+#       Compression yes
+#       ServerAliveInterval 120
+#       ServerAliveCountMax 3 
+#       LocalForward 3307 127.0.0.1:3306
+#       LocalForward 6380 127.0.0.1:6379
+#
+# ** YOU ALSO NEED THIS AT THE END OF .ssh/config **
+#
+#     Host *
+#         ControlPath /tmp/ssh-master-control-%r-at-%h-port-%p.sock
+#         ClearAllForwardings yes
+#
+# First time I ssh e-stage, all tunnels are setup; all others ssh e-
+# stage reuse the same connection
 
 function usage ()
 {
-  echo "Usage: x-ssh host [other options]"
-  echo ""
-  echo "  NOTE WELL: for now, the destination host must be the first option"
+  echo "Usage: x-ssh [ssh options]"
   exit 1
 }
 
-host=$1
-if [ -z "$host" ] ; then
+if [ -z "$1" ] ; then
   usage
 fi
 
-config=$HOME/.ssh/config
-if [ ! -r "$config" ] ; then
-  echo "Fatal: requires a ~/.ssh/config file"
-  exit 1
-fi
-
-grep -q "Host ${host}" "$config"
-if [ $? == 1 ] ; then
-  echo "Fatal: could not find config for $host in $config";
-  exit 1
-fi
-
-ssh -q -O check "$host" >/dev/null 2>&1
+ssh -q -O check $@ >/dev/null 2>&1
 if [ $? == 255 ] ; then
-  ssh -N -f -q -o ClearAllForwardings=no -o ControlMaster=yes "$host"
+  ssh -N -f -q -o ClearAllForwardings=no -o ControlMaster=yes $@
 fi
 
 ssh -o ClearAllForwardings=yes $@
