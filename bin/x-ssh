@@ -39,9 +39,9 @@ if [ -z "$1" ] ; then
   usage
 fi
 
-ssh -q -O check $@ >/dev/null 2>&1
+ssh -q -O check "$@" >/dev/null 2>&1
 if [ $? == 255 ] ; then
-  ssh -N -f -q -o ClearAllForwardings=no -o ControlMaster=yes $@
+  ssh -N -f -q -o 'ClearAllForwardings no' -o 'ControlMaster yes' "$@"
 fi
 
-ssh -o ClearAllForwardings=yes $@
+ssh -o 'ClearAllForwardings yes' "$@"
