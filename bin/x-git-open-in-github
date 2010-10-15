@@ -1,0 +1,17 @@
+#!/usr/bin/perl -w
+#
+#
+
+use strict;
+use warnings;
+
+die "ERROR: could not exec git remote -v\n"
+  unless open(my $gr, '-|', 'git remote -v');
+
+while (<$gr>) {
+  next unless m{\s+.+?github.com[:/](.*)/(.*)[.]git\s};
+  exec("open http://github.com/$1/$2");
+}
+
+print "Project does not seem to be hosted at github\n";
+
