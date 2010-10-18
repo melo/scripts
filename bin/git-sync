@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Sync local repo to all remotes
+#
+
+repos=`git remote`
+
+for repo in $repos ; do
+  echo "*** Pushing to '$repo'"
+  printf "   all branches... "
+  git push --all  $@ $repo
+  printf "   all tags....... "
+  git push --tags $@ $repo
+done
