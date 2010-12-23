@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec git log --no-merges --pretty=format:' - %s (%an)' $@
+exec git log --no-merges --pretty=format:'    * %s (%an)' $@ | perl -pe 's/ [()]Pedro Melo[)]$//'
