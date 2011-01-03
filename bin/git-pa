@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Do a git push to all our repositories
+#
+# Released to the public domain
+#
+# Pedro Melo, January 2011, <melo@simplicidade.org>
+
+
+for remote in `git remote` ; do
+  printf "*** $remote: "
+  git push $remote $@
+done
