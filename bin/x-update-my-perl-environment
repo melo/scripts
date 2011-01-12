@@ -8,7 +8,7 @@ fi
 cd $workdir
 
 minicpan
-git clone -b build/master git://github.com/melo/task-belike-melo.git bootstrap
+git clone git://github.com/melo/task-belike-melo.git bootstrap
 cd bootstrap && dzil run cpanm . || cpanm .
 
 for dir in "$HOME/.perl5" "$HOME/perl5" ; do
