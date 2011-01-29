@@ -1,0 +1,17 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my $total = 0;
+
+## Open and list form: only works on fork()-able OS's, so no Windows for you...
+open(my $prove_fh, '-|', 'prove', '-v', @ARGV);
+
+$|++;
+while (<$prove_fh>) {
+  print;
+  $total += $1 if m/^\s*1[.][.](\d+)\s*$/;
+}
+
+END { print "*** Total tests seen: $total\n" }
