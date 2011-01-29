@@ -5,8 +5,14 @@ use warnings;
 
 my $total = 0;
 
-## Open and list form: only works on fork()-able OS's, so no Windows for you...
-open(my $prove_fh, '-|', 'prove', '-v', @ARGV);
+my $prove_fh;
+if (-t \*STDIN) {
+  ## Open and list form: only works on fork()-able OS's, so no Windows for you...
+  open($prove_fh, '-|', 'prove', '-v', @ARGV);
+}
+else {
+  $prove_fh = \*STDIN;
+}
 
 $|++;
 while (<$prove_fh>) {
