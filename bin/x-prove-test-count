@@ -1,4 +1,28 @@
 #!/usr/bin/env perl
+#
+# TAP::Harness (the module prove uses to keep track of total tests)
+# doesn't understand subtests, so it doesn't count them.
+# 
+# The final report test count is only for top-level test count. Most of
+# the time, this is quite enough, but sometimes you want to know the
+# full test count.
+#
+# That's what this script does.
+#
+# You can run it in two ways:
+#
+# As a command, it will run prove for you, forcing -v (required for this
+# to work) and passes on all the extra parameters you give it
+#
+#      x-prove-test-count x-prove-test-count -l --state=save
+#
+# Alternatively you can run it as a filter:
+# 
+#      prove -lv | x-prove-test-count
+# 
+# Just don't forget to enable -v!
+# 
+# Pedro Melo <melo@simplicidade.org>, at 2011/01/29
 
 use strict;
 use warnings;
