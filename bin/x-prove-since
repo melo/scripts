@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+#
+
+ref=$1
+shift
+
+if [ -z "$ref" -o -z "$1" ] ; then
+  echo "Usage: x-prove-since REF COMMAND"
+  echo
+  echo "    Collects test files specified by REF, and"
+  echo "    run COMMAND on them"
+  echo
+  exit 1
+fi
+
+git diff --stat $ref                           \
+  | perl -ne '/^\s*(t\/.+[.]t)\s+\|/ && print "$1\0"'  \
+  | xargs -0 $@
