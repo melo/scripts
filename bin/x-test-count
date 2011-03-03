@@ -1,0 +1,30 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+if (-t \*STDIN) {
+  print <<"  EOU";
+Usage: <your prove command> | x-test-count
+
+Parses the TAP output and prints the number of ok/not ok test count,
+after all the input is spliced to the standard output. Requires
+prove to be run with verbose mode on.
+
+Usually prove shows that, but this script will also count subtests.
+
+TODO/SKIP tests are not supported.
+
+  EOU
+  exit(1);
+}
+
+my $ok = my $nok = 0;
+
+while (<>) {
+  $ok++ if /^\s*ok\s+(\d+)\s/;
+  $nok++ if /^\s*not ok\s+(\d+)\s/;
+  print;
+}
+
+print "*** Detected $ok oks, $nok not oks, for a total of ".($ok+$nok)." test cases\n";
