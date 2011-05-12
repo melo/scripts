@@ -9,9 +9,11 @@ use File::Spec::Functions qw( catfile );
 use File::HomeDir;
 
 my $once;
+my $clear;
 my $script;
 my $ok = GetOptions(
   'once'     => \$once,
+  'clear'    => \$clear,
   'script=s' => \$script,
 );
 usage() unless $ok;
@@ -57,6 +59,7 @@ END { map { $_->stop } keys %fh_map }
 
 ### Run the command
 sub run_command {
+  system('/usr/bin/clear') if $clear;
   system(@_);
   print STDERR "Executed: ", join(' ', @_), "\n";
 }
@@ -67,18 +70,23 @@ sub usage {
   my ($code, $mesg) = @_;
   
   print STDERR <<'...';
-Usage: x-test-continuous [--once|-o] [--script|-s=script_name] [command_to_run]
+Usage: x-test-continuous [options] [command_to_run]
 
   This utility watches the ./lib and ./t for modifications.
   If any modification is detected, a command is executed.
 
-  The command can be given in two ways: using the --script NAME, or given the
-  command on the command line.
+  If --clear is present, we run /usr/bin/clear before the command
+  execution.
+
+  The command can be given in two ways: using the --script NAME, or
+  given the command on the command line.
 
   Options:
   
     --script NAME or -s NAME
         executes ~/.test-continuous/NAME; exits if not found
+    --clear
+        executes /usr/bin/clear before the command execution
     --once
         executes the command once before starting to watch the directories
 
