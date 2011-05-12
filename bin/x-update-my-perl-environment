@@ -9,5 +9,10 @@ cd $workdir
 
 minicpan
 git clone git://github.com/melo/task-belike-melo.git bootstrap
-cd bootstrap && dzil run cpanm . || cpanm .
+
+cd bootstrap || exit
+
+dzil run cpanm . || cpanm .
+moose-outdated | cpanm
+dzil run cpanm . || cpanm .
 
