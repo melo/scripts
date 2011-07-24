@@ -1,0 +1,51 @@
+#!/usr/bin/env perl
+
+use 5.014;
+use warnings;
+use Pod::Simple::XHTML;
+use autodie;
+
+my ($module) = @ARGV;
+die <<EOF unless $module;
+Usage: pod2xhtml module
+EOF
+
+### Find the module file (TODO: make this cross-platform)
+my $filename = $module =~ s{::}{/}gr;
+$filename .= '.pm';
+
+my $path;
+for my $inc (@INC) {
+  next if ref($inc);
+
+  $path = "$inc/$filename";
+  last if -e $path;
+  undef $path;
+}
+
+die "Module '$module' not found\n" unless $path;
+
+my $psx = Pod::Simple::XHTML->new;
+$psx->output_string(\my $html);
+$psx->parse_file($path);
+
+### On tty, assume interactive and try and open a browser on it
+my $has_browser_open = eval { require Browser::Open };
+#say "has $has_browser_open ", (-t \*STDOUT);
+unless ($has_browser_open && -t \*STDOUT) {
+  say $html;
+  exit(0);
+}
+
+## Cache files (TODO: take in account mtime)
+my $cache = "$ENV{HOME}/.pod2xhtml";
+require File::Path;
+File::Path::mkpath($cache);
+
+my $cache_filename = $module =~ s{::}{-}gr;
+$cache_filename = "$cache/$cache_filename.html";
+
+open(my $out, '>', $cache_filename);
+say $out $html;
+
+Browser::Open::open_browser("file://$cache_filename");
