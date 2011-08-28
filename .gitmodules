@@ -1,0 +1,3 @@
+[submodule "git-extras"]
+	path = git-extras
+	url = https://github.com/visionmedia/git-extras.git
