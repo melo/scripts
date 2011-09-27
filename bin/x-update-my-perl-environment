@@ -22,3 +22,5 @@ dzil run cpanm --installdeps .
 moose-outdated | cpanm
 dzil run cpanm --installdeps .
 
+cpan-outdated | cpanm
+moose-outdated | cpanm
