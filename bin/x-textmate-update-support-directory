@@ -13,17 +13,22 @@
 export LC_CTYPE=en_US.UTF-8
 export LC_ALL=
 
+## 10.5.8 has old svn, so use new one
+export PATH=/opt/subversion/bin:$PATH
+
 # Update main Application Support directory
-cd '/Library/Application Support/TextMate' && svn --quiet update
+cd ~/work/textmate/system_config && svn --quiet update
+echo "---- Updated App support directory"
 
 # Check for updatable bundles in the personal Application Support directory
-cd ~
-cd "Library/Application Support/TextMate"
+cd ~/work/textmate/user_config
 
 for dir in `find . -name .git -type d` ; do
   ( cd $dir/.. && git pull --quiet && git gc --quiet )
+  echo "---- Updated $dir"
 done
 
 osascript -e 'tell app "TextMate" to reload bundles'
+echo "---- Reloaded bundles in TextMate"
 
 growlnotify -s "TextMate updated" -m "Support dir and local bundles updated" &
