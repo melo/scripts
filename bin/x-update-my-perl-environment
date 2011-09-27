@@ -7,9 +7,13 @@ if [ ! -d "$workdir" ] ; then
 fi
 cd $workdir
 
+which minicpan > /dev/null
+if [ $? == 1 ] ; then
+  cpanm CPAN::Mini
+fi
 minicpan
-git clone git://github.com/melo/task-belike-melo.git bootstrap
 
+git clone git://github.com/melo/task-belike-melo.git bootstrap
 cd bootstrap || exit
 
 which dzil > /dev/null
