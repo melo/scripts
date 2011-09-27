@@ -12,7 +12,13 @@ git clone git://github.com/melo/task-belike-melo.git bootstrap
 
 cd bootstrap || exit
 
-dzil run cpanm . || cpanm .
+which dzil > /dev/null
+if [ $? == 1 ] ; then
+  cpanm Dist::Zilla
+fi
+
+dzil authordeps | cpanm
+dzil run cpanm --installdeps .
 moose-outdated | cpanm
-dzil run cpanm . || cpanm .
+dzil run cpanm --installdeps .
 
