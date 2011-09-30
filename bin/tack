@@ -1,98 +1,94 @@
 #!/usr/bin/env perl
 
 use strict;
-use warnings;
+use 5.014;
 use TextMate::JumpTo qw( tm_location );
 use HTML::Tiny;
 use File::Temp qw( tempfile );
+use Data::Dump 'pp';
 
 $| = 1;
 
-my @args = grep { $_ ne '--nocolor' } @ARGV;
-unshift @args, '--color' unless grep { $_ eq '--color' } @args;
+my ($t, @args) = _args();
+my ($w, $h)    = _html_output();
 
-my $h = HTML::Tiny->new;
-
-my ($oh, $oname) = tempfile(SUFFIX => '.html');
-
-print $oh $h->open('html'), $h->head(
-  $h->title('Search results'),
-  $h->style(
-    do { local $/; <DATA> }
-  )
+$w->(
+  $h->open('html'),
+  $h->head(
+    $h->title("Search results for $t"),
+    $h->style(
+      do { local $/; <DATA> }
+    ),
+    $h->script(
+      { src =>
+          'https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js'
+      }
+    ),
   ),
   $h->open('body'),
-  $h->open('table');
-
-my $last_file = '';
-my $tr_style  = {};
+);
 
 open my $ack, '-|', 'ack', @args or die "Can't run ack ($!)";
+
+my $state = 'file';
+my $cfile;
 
 LINE:
 while (defined(my $line = <$ack>)) {
   chomp $line;
-  if ($line =~ /^--\s*$/) {
-    $tr_style = {class => 'dv'};
-    next LINE;
-  }
-  my @parts = grep {$_} split /(\x1b\[(?:K|\d+(?:;\d+)*m))/, $line;
-  my ($file, $line, @info);
-  for (@parts) {
-    if (/^([-:])(\d+)\1(.*)/) {
-      ($line, @info) = ($2, $3);
-    }
-    elsif (@info) {
-      push @info, $_ unless /^\x1b\[K/;
-    }
-    elsif ($_ !~ /^\x1b/) {
-      $file = $_;
-    }
-  }
 
-  my $state  = '';
-  my $pos    = 1;
-  my $column = 0;
+  given ($state) {
+    when ('file') {
+      next if /^\s*$/;
+      $w->(
+        $h->h1($h->a({href => tm_location(file => $line, line => 1)}, $line))
+      );
+      $w->($h->open('div'));
 
-  my $info = join '', map {
-        /^\x1b\[(.+)/
-      ? $state eq $1
-        ? ''
-        : do {
-          $state = $1;
-          $column ||= $pos;
-          $_ eq "\x1b[0m"
-            ? $h->close('a')
-            : $h->open(
-            'a',
-            { href => tm_location(
-                file   => $file,
-                line   => $line,
-                column => $pos
-              )
-            }
-            );
+      $state = 'in_block';
+      $cfile = $line;
+      next LINE;
+    }
+    when ('in_block') {
+      if (my ($ln, $f, $info) = $line =~ m/^(\d+)([:-])(.*)$/) {
+        my $matched = $f eq ':';
+        my $url = tm_location(file => $cfile, line => $ln);
+        $info =~ s/\t/  /g;
+
+        $w->(
+          $h->p(
+            {class => ($matched && 'matched')},
+            [ $h->a(
+                {href => $url},
+                [ $h->span({class => 'ln'},   $ln),
+                  $h->span({class => 'code'}, $info)
+                ]
+              ),
+            ]
+          )
+        );
       }
-      : do {
-      $pos += length $_;
-      _ns($h->entity_encode($_));
+      elsif (my ($sep) = $line =~ m/^(--)?\s*$/) {
+        $w->($h->close('div'));
+        $w->($h->open('div')) if $sep;
+        $state = 'file' unless $sep;
       }
-  } @info;
-
-  if ($last_file ne $file) {
-    print $oh $h->tr($h->th({colspan => 2}, $h->entity_encode($file)));
-    $last_file = $file;
-    $tr_style  = {};
+    }
   }
-
-  print $oh $h->tr($tr_style,
-    [$h->td({align => 'right', class => 'ln'}, $line), $h->td($info)]);
-  $tr_style = {};
 }
 close $ack;
-print $oh $h->close('table'), $h->close('body'), $h->close('html');
-close $oh;
-_open($oname, 0);
+
+my $hover_js = <<'EOS';
+$(function () {
+  $('.matched').hover(function () { $(this).toggleClass('hover'); });  
+});
+EOS
+
+$w->(
+  $h->close('div'),  $h->script([$hover_js]),
+  $h->close('body'), $h->close('html'),
+);
+_open($w->(), 0);
 
 sub _open {
   my ($url, $bg) = @_;
@@ -100,45 +96,84 @@ sub _open {
   system @cmd and die "Can't open $url ($?)";
 }
 
-sub _ns {
-  my $s = shift;
-  $s =~ s/\s/&nbsp;/g;
-  return $s;
+sub _args {
+  my @args =
+    grep { $_ ne '--color' && $_ ne '--noheading' && $_ ne '--nobreak' }
+    @ARGV;
+
+  my $title = join(' ', @args);
+
+  unshift @args, '--nocolor' unless grep { $_ eq '--nocolor' } @args;
+  unshift @args, '--heading' unless grep { $_ eq '--heading' } @args;
+  unshift @args, '--break'   unless grep { $_ eq '--break' } @args;
+  unshift @args, '--context=3'
+    unless grep { $_ =~ /^(--context=\d+)|(-C)$/ } @args;
+
+  return ($title, @args);
+}
+
+sub _html_output {
+  my $h = HTML::Tiny->new;
+  my ($fh, $filename) = tempfile(SUFFIX => '.html');
+
+  my $w = sub {
+    return $fh->print(@_) if @_;
+
+    close($fh);
+    return $filename;
+  };
+
+  return ($w, $h);
 }
 
 __DATA__
 
 html, body {
-    font-family: monospace;
-    background: black;
-    color: #eee;
+  font-family: monospace;
+  background: black;
 }
 
 a {
-    background: yellow;
-    color: black;
-    text-decoration: none;
+  text-decoration: none;
+  width: 100%;
 }
+
+h1 {
+  text-align: left;
+  border-bottom: 1px solid #222;
+  color: #ccc;
+  padding-top: 10px;
+  padding-bottom: 3px;
+  margin-bottom: 3px;
+}
+
+p {
+  color: #eee;
+  margin: 0px;
+  padding-left: 0 10px 0 10px;
+}
+
+.matched {
+  background: #111;
+  color: #fff;
+}
+
 
 .ln {
-    color: #666;
+  color: #444;
+  width: 5em;
+  text-align: right;
+  padding-right: 1em;
 }
 
-th {
-    text-align: left;
-    border-bottom: 1px solid #222;
-    color: #8f8;
-    padding-top: 10px;
-    padding-bottom: 3px;
-    margin-bottom: 3px;
+.code {
+  color: #eee;
 }
 
-td {
-    padding: 0px;
-    margin: 0px;
-    padding-left: 10px;
+.matched .code {
+  color: #fff;
 }
 
-.dv td {
-    padding-top: 18px;
+p.hover {
+  background: #555;
 }
