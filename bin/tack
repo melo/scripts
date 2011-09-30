@@ -1,0 +1,152 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use TextMate::JumpTo qw( tm_location );
+use HTML::Tiny;
+use File::Temp qw( tempfile );
+
+$| = 1;
+
+my @args = grep { $_ ne '--nocolor' } @ARGV;
+unshift @args, '--color' unless grep { $_ eq '--color' } @args;
+
+my $h = HTML::Tiny->new;
+
+my ( $oh, $oname ) = tempfile( SUFFIX => '.html' );
+
+print $oh $h->open( 'html' ), $h->head(
+    $h->title( 'Search results' ),
+    $h->style(
+        do { local $/; <DATA> }
+    )
+  ),
+  $h->open( 'body' ),
+  $h->open( 'table' );
+
+my $last_file = '';
+my $tr_style  = {};
+
+open my $ack, '-|', 'ack', @args or die "Can't run ack ($!)";
+
+LINE:
+while ( defined( my $line = <$ack> ) ) {
+    chomp $line;
+    if ( $line =~ /^--\s*$/ ) {
+        $tr_style = { class => 'dv' };
+        next LINE;
+    }
+    my @parts = grep { $_ } split /(\x1b\[(?:K|\d+(?:;\d+)*m))/, $line;
+    my ( $file, $line, @info );
+    for ( @parts ) {
+        if ( /^([-:])(\d+)\1(.*)/ ) {
+            ( $line, @info ) = ( $2, $3 );
+        }
+        elsif ( @info ) {
+            push @info, $_ unless /^\x1b\[K/;
+        }
+        elsif ( $_ !~ /^\x1b/ ) {
+            $file = $_;
+        }
+    }
+
+    my $state  = '';
+    my $pos    = 1;
+    my $column = 0;
+
+    my $info = join '', map {
+            /^\x1b\[(.+)/
+          ? $state eq $1
+              ? ''
+              : do {
+                  $state = $1;
+                  $column ||= $pos;
+                  $_ eq "\x1b[0m"
+                    ? $h->close( 'a' )
+                    : $h->open(
+                      'a',
+                      {
+                          href => tm_location(
+                              file   => $file,
+                              line   => $line,
+                              column => $pos
+                          )
+                      }
+                    );
+            }
+          : do {
+            $pos += length $_;
+            _ns( $h->entity_encode( $_ ) );
+          }
+    } @info;
+
+    if ( $last_file ne $file ) {
+        print $oh $h->tr(
+            $h->th( { colspan => 2 }, $h->entity_encode( $file ) ) );
+        $last_file = $file;
+        $tr_style  = {};
+    }
+
+    print $oh $h->tr(
+        $tr_style,
+        [
+            $h->td( { align => 'right', class => 'ln' }, $line ),
+            $h->td( $info )
+        ]
+    );
+    $tr_style = {};
+}
+close $ack;
+print $oh $h->close( 'table' ), $h->close( 'body' ),
+  $h->close( 'html' );
+close $oh;
+_open( $oname, 0 );
+
+sub _open {
+    my ( $url, $bg ) = @_;
+    my @cmd = ( '/usr/bin/open', ( $bg ? ( '-g' ) : () ), $url );
+    system @cmd and die "Can't open $url ($?)";
+}
+
+sub _ns {
+    my $s = shift;
+    $s =~ s/\s/&nbsp;/g;
+    return $s;
+}
+
+__DATA__
+
+html, body {
+    font-family: monospace;
+    background: black;
+    color: #eee;
+}
+
+a {
+    background: yellow;
+    color: black;
+    text-decoration: none;
+}
+
+.ln {
+    color: #666;
+}
+
+th {
+    text-align: left;
+    border-bottom: 1px solid #222;
+    color: #8f8;
+    padding-top: 10px;
+    padding-bottom: 3px;
+    margin-bottom: 3px;
+}
+
+td {
+    padding: 0px;
+    margin: 0px;
+    padding-left: 10px;
+}
+
+.dv td {
+    padding-top: 18px;
+}
