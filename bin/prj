@@ -266,8 +266,8 @@ sub _tag_release {
 }
 
 sub _current_branch_name {
-  my $cur_tag = `git name-rev --always --name-only HEAD`;
-  chomp $cur_tag;
-  
-  return $cur_tag;
+  my $name = `git symbolic-ref HEAD`;
+  chomp $name;
+  ($name) = $name =~ m{^refs/[^/]+/(.+)};
+  return $name;
 }
