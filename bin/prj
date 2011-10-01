@@ -200,7 +200,7 @@ sub load_cfg {
     close($fh);
   }
   else {
-    die "Could not open 'rules.prj' file in $root: $!\n";
+    fatal("Could not open 'rules.prj' file in $root: $!");
   }
   
   $cfg->{project} = $prj_cfg;
@@ -217,7 +217,7 @@ sub find_project_root {
 			$project_root = $cwd;
 		}
 		elsif ($cwd eq $ENV{HOME} || scalar(@cwd) == 1) {
-			die "Could not find project root (was looking for rules.prj)\n";
+			fatal("Could not find project root (was looking for rules.prj)");
 		}
 		else {
 			pop @cwd;
