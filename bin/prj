@@ -40,6 +40,9 @@ sub dispatch_command {
   if ($cmd eq 'deploy') {
     deploy($cfg, @args);
   }
+  elsif ($cmd eq 'environments') {
+    environments($cfg);
+  }
   else {
     usage("Command '$cmd' not understood");
   }
@@ -134,6 +137,20 @@ sub deploy {
   notify("Sucessfully deployed '$env' for project '$pname'", $pname, $env) unless $cfg{dryrun};
   return;
 }
+
+sub environments {
+  my ($cfg) = @_;
+
+  my $pretty = sub { print @_, "\n" };
+  if (is_tty()) {
+    print "List of available environments:\n";
+    $pretty = sub { print ' * ', @_, "\n" };
+  }
+
+  my $pcfg = $cfg->{project};
+  $pretty->($_) for sort keys %{$pcfg->{environments}};
+}
+
 
 #######
 # Usage
