@@ -9,7 +9,10 @@ use Getopt::Long;
 use Data::Dump ();
 use DateTime;
 
-my %cfg;
+my %cfg = (
+  verbose => 0,
+  quiet   => 0,
+);
 my $ok = GetOptions(
   \%cfg,
   "help",
@@ -19,10 +22,6 @@ my $ok = GetOptions(
 );
 usage() unless $ok;
 usage() if $cfg{help};
-
-$cfg{root} ||= find_project_root();
-$cfg{verbose} ||= 0;
-$cfg{quiet} ||= 0;
 
 dispatch_command(\%cfg, @ARGV);
 
@@ -34,14 +33,17 @@ sub dispatch_command {
     usage();
     return;
   }
-  
-  load_cfg($cfg);
 
   if ($cmd eq 'deploy') {
+    load_cfg($cfg);
     deploy($cfg, @args);
   }
   elsif ($cmd eq 'environments') {
+    load_cfg($cfg);
     environments($cfg);
+  }
+  elsif ($cmd eq 'setup_bash_complete') {
+    setup_bash_completion($cfg);
   }
   else {
     usage("Command '$cmd' not understood");
@@ -151,6 +153,44 @@ sub environments {
   $pretty->($_) for sort keys %{$pcfg->{environments}};
 }
 
+sub setup_bash_completion {
+  print <<'EOBC';
+
+### bash-completion setup code for prj app
+#
+# Add
+#
+#    prj_comp=`mktemp -t prj_completion.XXXXXXX`
+#    if [ -e "$prj_comp" ] ; then
+#      prj setup_bash_complete >> "$prj_comp"
+#      source "$prj_comp"
+#      rm -f "$prj_comp"
+#    fi
+#    unset prj_comp
+#
+# to your .bashrc or .bash_profile
+
+_prj_complete()
+{
+  local cur prev commands
+  _get_comp_words_by_ref cur prev
+
+  commands='deploy environments'
+
+  COMPREPLY=()
+  if [ $COMP_CWORD -eq 1 ] ; then
+      COMPREPLY=( $( compgen -W "$commands" -- "$cur" ) )
+  elif [ $COMP_CWORD -gt 1 -a "$prev" == "deploy" ] ; then
+    envs=`prj environments`
+    COMPREPLY=( $( compgen -W "$envs" -- "$cur" ) )
+  fi
+}
+
+complete -F _prj_complete -o default prj
+
+EOBC
+}
+
 
 #######
 # Usage
@@ -208,7 +248,7 @@ sub _log {
 
 sub load_cfg {
   my ($cfg) = @_;
-  my $root = $cfg->{root};
+  my $root = $cfg{root} ||= find_project_root();
   my $prj_cfg;
   
   if (open(my $fh, '<', catfile($root, 'rules.prj'))) {
