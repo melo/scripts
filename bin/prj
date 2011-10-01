@@ -174,6 +174,8 @@ sub fatal {
 }
 
 sub _log {
+  return unless is_tty();
+
   my $tag = shift;
   my $msg = join(' ', map { ref($_)? Data::Dump::pp($_) : $_ } @_);
   
