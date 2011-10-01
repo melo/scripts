@@ -241,6 +241,8 @@ sub notify {
   return;
 }
 
+sub is_tty { return -t \*STDOUT }
+
 sub _has_cmd {
   my ($cmd) = @_;
 
