@@ -57,6 +57,9 @@ while (defined(my $line = <$ack>)) {
         my $matched = $f eq ':';
         my $url = tm_location(file => $cfile, line => $ln);
         $info =~ s/\t/  /g;
+        $info =~ s/&/&lt;/g;
+        $info =~ s/</&lt;/g;
+        $info =~ s/>/&gt;/g;
 
         $w->(
           $h->p(
