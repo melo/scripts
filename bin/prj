@@ -13,13 +13,7 @@ my %cfg = (
   verbose => 0,
   quiet   => 0,
 );
-my $ok = GetOptions(
-  \%cfg,
-  "help",
-  "verbose+",
-  "quiet",
-  "dryrun|n"
-);
+my $ok = GetOptions(\%cfg, "help", "verbose+", "quiet", "dryrun|n");
 usage() unless $ok;
 usage() if $cfg{help};
 
@@ -28,7 +22,7 @@ dispatch_command(\%cfg, @ARGV);
 
 sub dispatch_command {
   my ($cfg, $cmd, @args) = @_;
-  
+
   if (!defined($cmd)) {
     usage();
     return;
@@ -48,8 +42,8 @@ sub dispatch_command {
   else {
     usage("Command '$cmd' not understood");
   }
-  
-  return
+
+  return;
 }
 
 
@@ -77,10 +71,10 @@ sub deploy {
 
   ### Include excludes
   if (my $excl = $pcfg->{paths}{exclude}) {
-    $excl = [ $excl ] unless ref($excl) eq 'ARRAY';
+    $excl = [$excl] unless ref($excl) eq 'ARRAY';
     push @$rsync, map { ('--exclude', $_) } @$excl;
   }
-  
+
   ### Add common rsync options
   push @$rsync, '-v' if $cfg->{verbose} || $pcfg->{verbose};
   push @$rsync, '-n' if $cfg->{dryrun};
@@ -89,7 +83,8 @@ sub deploy {
   ### Hosts to use
   my @hosts = @{$ecfg->{hosts} || []};
   push @hosts, $ecfg if $ecfg->{host};
-  fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg") unless @hosts;
+  fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg")
+    unless @hosts;
 
   ### Check for proper branch
   if (my $branch_name = $ecfg->{branch}) {
@@ -123,20 +118,22 @@ sub deploy {
 
     debug('Rsync command:', \@cmd);
     system(@cmd) unless $cfg{dryrun};
-    
+
     if (exists $ecfg->{post_deploy}) {
       @cmd = ('ssh', $host->{host});
       push(@cmd, '-v') if $cfg->{verbose} || $pcfg->{verbose};
       push(@cmd, '-l', $host->{user}) if $host->{user};
       push(@cmd, '-p', $host->{port}) if $host->{port};
-      push @cmd, "cd ".($host->{path} || $ecfg->{path})." && $ecfg->{post_deploy}";
-      
+      push @cmd,
+        "cd " . ($host->{path} || $ecfg->{path}) . " && $ecfg->{post_deploy}";
+
       debug('Post deploy command:', \@cmd);
       system(@cmd) unless $cfg{dryrun};
     }
   }
 
-  notify("Sucessfully deployed '$env' for project '$pname'", $pname, $env) unless $cfg{dryrun};
+  notify("Sucessfully deployed '$env' for project '$pname'", $pname, $env)
+    unless $cfg{dryrun};
   return;
 }
 
@@ -197,7 +194,7 @@ EOBC
 
 sub usage {
   my ($msg, @others) = @_;
-  
+
   print STDERR <<EOU;
 Usage: prj COMMAND ARGS
 
@@ -221,12 +218,12 @@ EOU
 sub debug {
   return if $cfg{quiet};
   return unless $cfg{verbose} > 1;
-  
-  return _log('DEBUG', @_);  
+
+  return _log('DEBUG', @_);
 }
 
 sub fatal {
-  _log('FATAL', @_);  
+  _log('FATAL', @_);
   exit(1);
 }
 
@@ -234,8 +231,8 @@ sub _log {
   return unless is_tty();
 
   my $tag = shift;
-  my $msg = join(' ', map { ref($_)? Data::Dump::pp($_) : $_ } @_);
-  
+  my $msg = join(' ', map { ref($_) ? Data::Dump::pp($_) : $_ } @_);
+
   foreach my $line (split(/\n\r?/, $msg)) {
     print STDERR "[$tag]: $line\n";
   }
@@ -250,7 +247,7 @@ sub load_cfg {
   my ($cfg) = @_;
   my $root = $cfg{root} ||= find_project_root();
   my $prj_cfg;
-  
+
   if (open(my $fh, '<', catfile($root, 'rules.prj'))) {
     local $/;
     $prj_cfg = decode_json(<$fh>);
@@ -259,30 +256,30 @@ sub load_cfg {
   else {
     fatal("Could not open 'rules.prj' file in $root: $!");
   }
-  
+
   $cfg->{project} = $prj_cfg;
 }
 
 sub find_project_root {
-	my $project_root;
-	
-	my @cwd = splitdir(getcwd());
-	do {
-		my $cwd = catdir(@cwd);
-		
-		if (-e catfile($cwd, 'rules.prj')) {
-			$project_root = $cwd;
-		}
-		elsif ($cwd eq $ENV{HOME} || scalar(@cwd) == 1) {
-			fatal("Could not find project root (was looking for rules.prj)");
-		}
-		else {
-			pop @cwd;
-		}
-	} while (!$project_root);
-	
-	return @cwd if wantarray;
-	return $project_root;
+  my $project_root;
+
+  my @cwd = splitdir(getcwd());
+  do {
+    my $cwd = catdir(@cwd);
+
+    if (-e catfile($cwd, 'rules.prj')) {
+      $project_root = $cwd;
+    }
+    elsif ($cwd eq $ENV{HOME} || scalar(@cwd) == 1) {
+      fatal("Could not find project root (was looking for rules.prj)");
+    }
+    else {
+      pop @cwd;
+    }
+  } while (!$project_root);
+
+  return @cwd if wantarray;
+  return $project_root;
 }
 
 sub notify {
@@ -291,7 +288,11 @@ sub notify {
   eval { require WebService::Notifo };
   if (!$@) {
     my $n = WebService::Notifo->new;
-    $n->send_notification( label => 'prj', title => "$proj ($env)", msg => $message);
+    $n->send_notification(
+      label => 'prj',
+      title => "$proj ($env)",
+      msg   => $message
+    );
   }
   elsif (my $gn = _has_cmd('growlnotify')) {
     system($gn, '-m', $message, 'prj deploy status');
@@ -319,9 +320,9 @@ sub _has_cmd {
 
 sub _tag_release {
   my ($env) = @_;
-  
+
   my $now = DateTime->now;
-  my $tag = join('-', 'release', $env, $now->ymd('').$now->hms(''));
+  my $tag = join('-', 'release', $env, $now->ymd('') . $now->hms(''));
 
   return system('git', 'tag', $tag);
 }
