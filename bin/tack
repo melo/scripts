@@ -15,6 +15,9 @@ my ($w, $h)    = _html_output();
 $w->(
   $h->open('html'),
   $h->head(
+    $h->meta(
+      {'http-equiv' => 'Content-Type', content => 'text/html; charset=utf-8'}
+    ),
     $h->title("Search results for $t"),
     $h->style(
       do { local $/; <DATA> }
