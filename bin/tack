@@ -86,7 +86,7 @@ close $ack;
 
 my $hover_js = <<'EOS';
 $(function () {
-  $('.matched').hover(function () { $(this).toggleClass('hover'); });  
+  $('.matched').hover(function () { $(this).toggleClass('hover'); });
 });
 EOS
 
