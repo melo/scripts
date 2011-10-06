@@ -8,4 +8,17 @@ use strict;
 use warnings;
 use Text::Autoformat;
 
-autoformat({ all => 1 });
+my $text = do { local $/; <> };
+my $preamble;
+
+if (my $filename = $ENV{TM_FILENAME}) {
+  ## FIXME: use mime::types to fetch the content-type and use that to
+  ## apply rules
+  if ($filename =~ m/[.]m?md/) {    ## MultiMarkdown, skip the metadata
+    ($preamble, $text) = split(/\n\n/, $text, 2);
+    $preamble .= "\n\n";
+  }
+}
+
+print $preamble if $preamble;
+print autoformat($text, {all => 1});
