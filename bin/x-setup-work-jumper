@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# our work directory jump point
+#
+# To install add to .bashrc:
+#
+#  . ~/path/to/x-setup-work-jumper
+#
+# Adds 'j' command, try it
+#
+# Pedro Melo, 2011/10/22
+#
+
+work_jump_directory=${work_jump_directory:-$HOME/work}
+export work_jump_directory
+
+j()
+{
+  cd $1
+}
+
+_j_complete()
+{
+  local cur
+  cur=$2
+  
+  if [ "${cur:0:${#work_jump_directory}}" != "$work_jump_directory" ] ; then
+    cur="$work_jump_directory/$cur"
+  fi
+  
+  COMPREPLY=( $( compgen -A directory "$cur" ) )
+}
+
+complete -o nospace -S / -F _j_complete j
