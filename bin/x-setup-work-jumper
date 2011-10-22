@@ -6,7 +6,12 @@
 #
 #  . ~/path/to/x-setup-work-jumper
 #
-# Adds 'j' command, try it
+# Adds 'jj' command, try it
+#
+# Originaly it was just 'j', but then I discovered autojump which I also
+# like, and decided to rename this one 'jj'
+#
+# autojump is at https://github.com/joelthelion/autojump#readme
 #
 # Pedro Melo, 2011/10/22
 #
@@ -14,12 +19,12 @@
 work_jump_directory=${work_jump_directory:-$HOME/work}
 export work_jump_directory
 
-j()
+jj()
 {
   cd $1
 }
 
-_j_complete()
+_jj_complete()
 {
   local cur
   cur=$2
@@ -31,4 +36,4 @@ _j_complete()
   COMPREPLY=( $( compgen -A directory "$cur" ) )
 }
 
-complete -o nospace -S / -F _j_complete j
+complete -o nospace -S / -F _jj_complete jj
