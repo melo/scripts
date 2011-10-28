@@ -1,0 +1,44 @@
+#!/usr/bin/env perl
+#
+# Try to run a perl script, install missing modules and retry if
+# it fails
+#
+# mpr stands for magical perl run. All software should be magical.
+#
+# Written by Pedro Melo <melo@simplicidade.org>, 2011/10/28
+#
+
+use strict;
+use warnings;
+use IPC::Open3 'open3';
+
+my $install_cmd = 'cpanm';    ## miyagawa++
+
+TRY: while (1) {
+  debug('EXECing', @ARGV);
+  my $pid = open3(\*IN, \*OUT, undef, @ARGV);
+  die "Could not exec command @ARGV: $!, " unless $pid;
+  close(IN);
+
+  while (<OUT>) {
+    print $_;
+    if (m/locate (\S+)[.]pm in [@]INC/ or m/^(\S+) version \S+ required/) {
+      (my $pm = $1) =~ s{/}{::}g;
+      debug('GOT PM TO INSTALL', $pm);
+
+      debug('KILL PROBLEM CHILD', $pid);
+      kill 9, $pid;    ## Just in case he is acting stupid...
+      waitpid($pid, 0);
+
+      debug('INSTALL', $pm, 'using', $install_cmd);
+      system($install_cmd, $pm);
+      redo TRY;
+    }
+  }
+  debug('BE WELL');
+  exit(0);
+}
+
+sub debug {
+  print "#####[$$] @_\n" if $ENV{DEBUG};
+}
