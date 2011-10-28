@@ -30,8 +30,15 @@ TRY: while (1) {
       kill 9, $pid;    ## Just in case he is acting stupid...
       waitpid($pid, 0);
 
+      if ($ENV{VERBOSE}) {
+        print "\n\n***** Missing dependency detected: $pm\n";
+        print "***** Running '$install_cmd $pm' to solve it\n\n";
+      }
+
       debug('INSTALL', $pm, 'using', $install_cmd);
       system($install_cmd, $pm);
+
+      print "\n\n***** Done '$install_cmd $pm'\n\n" if $ENV{VERBOSE};
       redo TRY;
     }
   }
