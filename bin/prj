@@ -102,6 +102,7 @@ sub deploy {
   END { unlink('.release') }
   system('git describe --always --tags > .release');
   system('pwd >> .release');
+  system('git show HEAD >> .release');
 
   ### rsync to each one
   foreach my $host (@hosts) {
