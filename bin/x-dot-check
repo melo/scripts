@@ -1,0 +1,112 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use File::Spec::Functions qw( catfile catdir );
+use Cwd qw( realpath );
+
+my $home  = $ENV{HOME};
+die "FATAL: missing HOME environment\n" unless $home;
+
+my $rdots = catdir('.dots', 'configs');
+my $dots  = catdir($home, $rdots);
+die "FATAL: missing dot configuration at '$dots'\n" unless -d $dots;
+
+
+# Ignore list
+my @ignore_dots = (
+  '.dots',
+  '.scripts.d',
+  '.homebrew',
+  
+  '.CFUserTextEncoding',
+  '.DS_Store',
+  '.Trash',
+  '.dropbox',
+  '.perl5',
+  '.gem',
+  '.cpan',
+  '.cpanm',
+  '.cpan_mini_webserver',
+  
+  '.viminfo',
+  '.fontconfig',
+  
+  '.bash_history',
+  '.lesshst',
+  '.mysql_history',
+  '.sqlite_history',
+  '.gdb_history',
+  
+  '.bzr.log',
+);
+my %ignore_dots = map { $_ => 'ignore' } @ignore_dots;
+
+
+# Load template files
+my @known_templates = read_templates($dots);
+
+# For each, Check home: if exists, must point to it; if not exists create it; else complain
+for my $dot (@known_templates) {
+  $ignore_dots{".$dot"} = 'known dots';
+  
+  my $home_dot = catfile($home, ".$dot");
+  my $dest_dot = catfile($rdots, $dot);
+  
+  if (-l $home_dot) {
+    my $links_to = readlink($home_dot);
+#    print "IsA symblink: now '$links_to', should be '$dest_dot'\n";
+    next if $links_to eq $dest_dot;
+    
+    print "ERROR: 'HOME/.$dot' is a symblink, but points to '$links_to',\n";
+    print "       should be '$dest_dot'. Remove it, and\n";
+    print "       run '$0' again\n";
+  }
+  
+  if (-e $home_dot) {
+    print "ERROR: 'HOME/.$dot' exists but its not a symblink:\n";
+    print "       compare to '$dest_dot',\n";
+    print "       remove it and run $0 again\n";
+  }
+  else {
+    symlink($dest_dot, $home_dot) || die "FATAL: could not symblink() '$dest_dot' to '$home_dot': $!";
+    print "Created symlink '$home_dot' => '$dest_dot'\n";
+  }
+}
+
+
+# Load all home dot files
+my @home_dots = read_dots($home);
+
+for my $dot (@home_dots) {
+  next if exists $ignore_dots{$dot};
+  
+  print "WARN: dot file '$dot' in HOME is unknown\n";
+}
+
+
+sub read_dots {
+  my ($dir) = @_;
+  my @dots;
+  
+  opendir(my $dh, $dir) || die "FATAL: could not list directory '$dir': $!\n";
+  while (my $dot = readdir($dh)) {
+    push @dots, $dot if $dot =~ /^[.]\w/;
+  }
+  closedir($dh);
+  
+  return @dots;
+}
+
+sub read_templates {
+  my ($dir) = @_;
+  my @dots;
+  
+  opendir(my $dh, $dir) || die "FATAL: could not list directory '$dir': $!\n";
+  while (my $dot = readdir($dh)) {
+    push @dots, $dot unless $dot =~ /^[.]/;
+  }
+  closedir($dh);
+  
+  return @dots;
+}
