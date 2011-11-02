@@ -13,34 +13,8 @@ my $dots  = catdir($home, $rdots);
 die "FATAL: missing dot configuration at '$dots'\n" unless -d $dots;
 
 
-# Ignore list
-my @ignore_dots = (
-  '.dots',
-  '.scripts.d',
-  '.homebrew',
-  
-  '.CFUserTextEncoding',
-  '.DS_Store',
-  '.Trash',
-  '.dropbox',
-  '.perl5',
-  '.gem',
-  '.cpan',
-  '.cpanm',
-  '.cpan_mini_webserver',
-  
-  '.viminfo',
-  '.fontconfig',
-  
-  '.bash_history',
-  '.lesshst',
-  '.mysql_history',
-  '.sqlite_history',
-  '.gdb_history',
-  
-  '.bzr.log',
-);
-my %ignore_dots = map { $_ => 'ignore' } @ignore_dots;
+# Read ignore list
+my %ignore_dots = read_excludes(catfile($home, '.dotsrc'));
 
 
 # Load template files
@@ -109,4 +83,21 @@ sub read_templates {
   closedir($dh);
   
   return @dots;
+}
+
+sub read_excludes {
+  my ($file) = @_;
+
+  open(my $fh, '<', $file) or return;
+
+  my %dots;
+  while (<$fh>) {
+    s/^\s+|\s+$//g;
+    next unless $_;
+    next if /^#/;
+
+    $dots{$_} = 'ignore';
+  }
+
+  return %dots;
 }
