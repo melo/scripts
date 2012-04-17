@@ -133,8 +133,7 @@ sub deploy {
     }
   }
 
-  notify("Sucessfully deployed '$env' for project '$pname'", $pname, $env)
-    unless $cfg{dryrun};
+  notify($cfg, "Sucessfully deployed '$env' for project '$pname'", $pname, $env);
   return;
 }
 
@@ -284,8 +283,14 @@ sub find_project_root {
 }
 
 sub notify {
-  my ($message, $proj, $env) = @_;
+  my ($cfg, $message, $proj, $env) = @_;
 
+  return if $cfg->{dryrun};
+  my $pid = fork();
+  fatal("Could not fork(), could not notify: $!") unless defined $pid;
+  return if $pid;  ## Parent leaves
+
+  ## Child tries to notify
   eval { require WebService::Notifo };
   if (!$@) {
     my $n = WebService::Notifo->new;
