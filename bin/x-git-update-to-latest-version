@@ -46,11 +46,23 @@ read confirmation
 
 if [ "$confirmation" != "y" ] ; then exit ; fi
 
+for repo in git-htmldocs git-manpages ; do
+  (
+    cd $repo
+    git reset --hard
+    git fetch
+    git merge --ff --no-edit origin/master
+  )
+done
+
+cd core
+
 if [ -e configure ] ; then
   make distclean
 fi
 
-git pull
+git fetch
+git merge --ff --no-edit origin/master
 
 version=`git describe --always`
 
@@ -89,10 +101,7 @@ echo "******* Installing git and documentation"
 echo
 
 sudo make install
-sudo make quick-install-doc
-
-git branch -D html
-git branch html origin/html
+sudo make quick-install-man quick-install-html
 
 
 echo
@@ -134,9 +143,6 @@ sudo sh -c "
   cd $BASE;
   rm -f git;
   ln -s git-$version git;
-  mkdir -p git/share/doc;
-  cd git/share/doc;
-  git clone -s $GIT_CLONE_DIR git-doc --branch html;
 "
 
 echo
