@@ -1,0 +1,26 @@
+#!/usr/bin/env perl
+#
+# Remove duplicate tags for the same SHA1
+#
+
+use strict;
+use warnings;
+
+open(my $tag_list, '-|', 'git show-ref --tags | sort -r')
+  || die "Failed to exec git show-ref: $!,";
+
+my %dups;
+while (<$tag_list>) {
+  my ($sha, $tag) = m{^([0-9a-f]+) refs/tags/(.+)};
+  next unless $sha && $tag;
+
+  if (exists $dups{$sha}) {
+    my $r = system('git', 'tag', '-d', $tag);
+    print "Failed to exec() - git tag -d $tag: $!" if $r >> 8;
+  }
+  else {
+    $dups{$sha} = $tag;
+  }
+}
+
+close($tag_list);
