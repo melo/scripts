@@ -43,15 +43,15 @@ sub generate_report {
   my $cur_date = '';
   while (my $raw = <$fh>) {
     my ($ts, $repo, $hash, $subject) = $raw =~ m/^(\d+)\s+(\S+)\s+([a-f0-9]+)\s+(.*)$/;
-    
-    my ($year, $month, $day, $hour, $min) = (localtime($ts))[5,4,3,2,1];
-    my $date = sprintf('%.4d/%0.2d/%0.2d', $year+1900, $month+1, $day);
-    
+
+    my ($year, $month, $day, $hour, $min) = (localtime($ts))[5, 4, 3, 2, 1];
+    my $date = sprintf('%.4d/%0.2d/%0.2d', $year + 1900, $month + 1, $day);
+
     if ($date ne $cur_date) {
       $cur_date = $date;
       print "\n$cur_date:\n";
     }
-    
+
     printf('    %0.2d:%0.2d: (%s) - %s [%s]%s', $hour, $min, $repo, $subject, substr($hash, 0, 7), "\n");
   }
 }
