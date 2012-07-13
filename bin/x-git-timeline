@@ -5,16 +5,29 @@
 #
 #   Usage: x-git-timeline path_to_repo1 path_to_repo2 [-- [git log options]]  > timeline.html
 #
+# The path_to_repoN options can be:
+#   * a simple path to a repo, like some/path/to/repo
+#   * a name and a path to the repo, like repo_name=some/path/to/repo.
+#
+# Each commit in the output is tagged with the name of the repo. If none
+# was provided, we use the basename of the path.
+#
+# You can provide extra git-log options, like --since="2 days ago" but
+# remember that if you merge an older branch in the last 2 days some of
+# those old commits will be shown. Another usefull option
+# is --author="me".
+#
 # I wrote this because over the course of a week, I commit to several
-# repositories of work projects, pet projects, other peoples projects,
-# and I wanted to get a feel of where I worked on in the past couple of days
+# repositories of work projects, pet projects, other peoples
+# projects, and I wanted to get a feel of where I worked on in the
+# past couple of days
 #
 # Author: Pedro Melo <melo@simplicidade.org>
 #
 # License: Artistic License 2.0
 #
 # TODO: stop using cmd line sort do it internaly
-# 
+#
 # Changelog: https://github.com/melo/scripts/commits/master/bin/x-git-timeline
 
 use strict;
