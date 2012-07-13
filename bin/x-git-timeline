@@ -1,0 +1,68 @@
+#!/usr/bin/env perl
+#
+# x-git-timeline: generate a simple one HTML page site with commits of
+# several git projects merged together, ordered by commit date
+#
+#   Usage: x-git-timeline path_to_repo1 path_to_repo2 [-- [git log options]]  > timeline.html
+#
+# I wrote this because over the course of a week, I commit to several
+# repositories of work projects, pet projects, other peoples projects,
+# and I wanted to get a feel of where I worked on in the past couple of days
+#
+# Author: Pedro Melo <melo@simplicidade.org>
+#
+# License: Artistic License 2.0
+#
+# TODO: stop using cmd line sort do it internaly
+
+use strict;
+
+
+my ($repos, $git_log_opts) = _parse_cmd_line();
+my $fh = _build_cmd_line($repos, $git_log_opts);
+generate_report($fh);
+
+sub generate_report {
+  my ($fh) = @_;
+
+  my $cur_date = '';
+  while (my $raw = <$fh>) {
+    my ($ts, $repo, $hash, $subject) = $raw =~ m/^(\d+)\s+(\S+)\s+([a-f0-9]+)\s+(.*)$/;
+    
+    my ($year, $month, $day, $hour, $min) = (localtime($ts))[5,4,3,2,1];
+    my $date = sprintf('%.4d/%0.2d/%0.2d', $year+1900, $month+1, $day);
+    
+    if ($date ne $cur_date) {
+      $cur_date = $date;
+      print "\n$cur_date:\n";
+    }
+    
+    printf('    %0.2d:%0.2d: (%s) - %s [%s]%s', $hour, $min, $repo, $subject, substr($hash, 0, 7), "\n");
+  }
+}
+
+
+sub _build_cmd_line {
+  my ($repos, $git_log_opts) = @_;
+
+  my $cmd_line = 'sort -rn ';
+  for my $r (@$repos) {
+    $cmd_line .= qq{ <( cd "$r->{path}" && git log "--pretty=format:%at $r->{name} %H %s" --branches $git_log_opts )};
+  }
+  $cmd_line = "bash -c '$cmd_line'";
+
+  open(my $commit_fh, '-|', $cmd_line) or die "Failed to exec '$cmd_line': $!";
+  return $commit_fh;
+}
+
+sub _parse_cmd_line {
+  my @repos;
+  while (defined(my $i = shift @ARGV)) {
+    last if $i eq '--';
+    $i =~ m!^(([^=]+)=)?(.*?([^/]+))$!;
+    push @repos, { path => $3, name => $2 || $4 };
+  }
+
+  return (\@repos, join(' ', map {qq{"$_"}} @ARGV));
+}
+
