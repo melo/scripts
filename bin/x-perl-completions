@@ -1,0 +1,159 @@
+#!/usr/bin/env perl
+#
+# A huge number of completion strings for Perl programming
+#
+# To activate on TextMate, open Bundle Editor, add a new preference item with this text:
+#
+#   {	completionCommand = 'x-perl-completions -f "$TM_SELECTED_FILE" "$TM_CURRENT_WORD"'; }
+#
+# and make sure the Scope Selector is source.perl
+#
+# Pedro Melo, 2012
+# License: Artistic v2
+#
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+sub usage { die "Usage: x-textmate-perl-completions [-f filename] word_to_complete\n" }
+my ($word, $file, $debug);
+GetOptions('file=s' => \$file, 'debug=s' => \$debug)
+  or usage();
+$word = shift @ARGV;
+usage() unless $word;
+
+
+# TODO: for future needs
+# my $source;
+# $source = do { local $/; my $fh; open($fh, '<', $file) && <$fh> } if $file;
+
+my @completions;
+my @modules;
+
+## Global completions
+push @completions, '#!perl', '#!/usr/bin/env perl';
+push @completions, qw(
+  new
+  chomp chop chr crypt hex index lc lcfirst length oct ord pack reverse
+  rindex sprintf substr tr uc ucfirst
+  pos quotemeta split study qr
+  abs atan2 cos exp hex int log oct rand sin sqrt srand
+  each keys pop push shift splice unshift values
+  grep join map reverse sort unpack
+  delete each exists keys values
+  binmode close closedir die eof fileno flock format
+  getc print printf read readdir rewinddir say seek seekdir select
+  syscall sysread sysseek syswrite tell telldir truncate warn write
+  pack read syscall sysread syswrite unpack vec
+  chdir chmod chown chroot fcntl glob ioctl link lstat mkdir open opendir
+  readlink rename rmdir stat symlink sysopen umask unlink utime
+  caller continue die do dump eval exit goto last next redo return sub
+  wantarray
+  break continue default given when
+  caller import local my our package state use
+  defined dump eval formline local my our reset scalar state undef wantarray
+  alarm exec fork getpgrp getppid getpriority kill pipe setpgrp setpriority
+  sleep system times wait waitpid
+  do import no package require use
+  bless dbmclose dbmopen package ref tie tied untie use
+  accept bind connect getpeername getsockname getsockopt listen recv send
+  setsockopt shutdown socket socketpair
+  msgctl msgget msgrcv msgsnd semctl semget semop shmctl shmget shmread
+  shmwrite
+  endgrent endhostent endnetent endpwent getgrent getgrgid getgrnam getlogin
+  getpwent getpwnam getpwuid setgrent setpwent
+  endprotoent endservent gethostbyaddr gethostbyname gethostent getnetbyaddr
+  getnetbyname getnetent getprotobyname getprotobynumber getprotoent
+  getservbyname getservbyport getservent sethostent setnetent setprotoent
+  setservent
+  gmtime localtime time times
+  abs bless break chomp chr continue default exists formline given glob
+  import lc lcfirst lock map my no our prototype readline readpipe ref
+  sub sysopen tie tied uc ucfirst untie use when
+  __PACKAGE__ __END__ __FILE__ __LINE__ __DATA__
+  BEGIN INIT CHECK END
+  ISA VERSION
+);
+push @completions, map {"=$_"} qw( encoding head1 head2 head3 head4 over item back for );
+
+push @modules, qw(
+  5.014 strict warnings lib base parent utf8
+  Moo Moo::Role
+  Moose Moose::Role
+  namespace::autoclean
+  DateTime DateTime::Format::MySQL
+  Carp
+  Time::HiRes
+  Try::Tiny
+  Sub::Name
+  Data::Dump
+  Scalar::Util
+  JSON JSON::XS
+  AnyEvent
+  ZeroMQ
+  Encode
+  Data::UUID Data::UUID::LibUUID
+  Exporter
+);
+push @modules, 'namespace::clean', "namespace::clean -except => 'meta'";
+
+## Test modules
+if ($file && $file =~ /[.]t$/) {
+  push @modules, qw( Test::More Test::Deep Test::Fatal Test::LongString );
+
+  push @completions, qw(
+    ok is isnt like unlike can_ok isa_ok new_ok pass fail done_testing
+    subtest diag note explain SKIP TODO todo_skip BAIL_OUT
+
+    cmp_deeply cmp_bag cmp_set cmp_methods eq_deeply cmp_details
+    ignore methods listmethods shallow noclass useclass re
+    superhashof subhashof bag set superbagof all any isa array_each
+    str num bool code deep_diag
+
+    exception
+
+    like_string
+  );
+}
+
+
+## Make Moo/Moose/Scalar::Util/Carp and others stuff available, always
+push @completions, qw(
+  extends with
+  has
+  before around after
+  BUILD BUILDARGS DEMOLISH
+  does
+  quote_sub
+  is isa default weak_ref init_arg builder clearer ro rw rwp lazy
+  blessed
+  carp croak confess longmess
+  encode_json decode_json
+  encode decode
+  try catch finally
+  gettimeofday tv_interval usleep
+  method func
+  EXPORT EXPORT_OK EXPORT_TAGS
+);
+
+
+## Add modules, smartly
+push @completions, @modules;
+push @completions, map {"use $_"} @modules;
+
+
+## Filter completions
+my %seen;
+my @matched = grep { !$seen{$_}++ } grep {/^$word/} @completions;
+
+if ($debug) {
+  open(my $fh, '>', $debug);
+  print $fh "List of all words collected:\n";
+  print $fh map {"\t$_\n"} @completions;
+  print $fh "\nMList of matched completions with word '$word':\n";
+  print $fh map {"\t$_\n"} @matched;
+  close($fh);
+}
+
+print map {"$_\n"} @matched;
