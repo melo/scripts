@@ -24,9 +24,8 @@ $word = shift @ARGV;
 usage() unless $word;
 
 
-# TODO: for future needs
-# my $source;
-# $source = do { local $/; my $fh; open($fh, '<', $file) && <$fh> } if $file;
+my $source;
+$source = do { local $/; my $fh; open($fh, '<', $file) && <$fh> } if $file;
 
 my @completions;
 my @modules;
@@ -136,6 +135,18 @@ push @completions, qw(
   method func
   EXPORT EXPORT_OK EXPORT_TAGS
 );
+
+
+## Add package names for current module
+push @modules, m/^\s*package\s+(\S+)/gm if $source;
+if ($file && $file =~ /[.]pm$/) {
+  my ($lib, $module) = $file =~ m{^(.+/lib/)(.+)[.]pm$};
+  ## TODO: if --scan-modules use $lib to scan for other modules in this
+  ## project; do the same if /t/ is found
+
+  $module =~ s/\//::/g;
+  push @modules, $module;
+}
 
 
 ## Add modules, smartly
