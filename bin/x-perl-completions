@@ -136,6 +136,16 @@ push @completions, qw(
   method func
   EXPORT EXPORT_OK EXPORT_TAGS
 );
+## Some of my favorites
+push @completions,
+  'clearer => 1,',
+  "is => 'lazy',",
+  "is => 'ro',",
+  "is => 'rwp',",
+  "is => 'rw',",
+  "default => sub {},",
+  "weak_ref => 1,",
+  ;
 
 
 ## Add package names for current module
