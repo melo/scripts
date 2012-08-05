@@ -151,9 +151,7 @@ push @completions,
 ## Add package names for current module
 push @modules, $source =~ m/^\s*package\s+(\S+)/gm if $source;
 if ($file && $file =~ /[.]pm$/) {
-  my ($lib, $module) = $file =~ m{^(.+/lib/)(.+)[.]pm$};
-  ## TODO: if --scan-modules use $lib to scan for other modules in this
-  ## project; do the same if /t/ is found
+  my ($module) = $file =~ m!/t?lib/(.+)[.]pm$!;
 
   $module =~ s/\//::/g;
   push @modules, $module;
