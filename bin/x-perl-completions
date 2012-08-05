@@ -15,6 +15,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Path::Class 'dir';
 
 sub usage { die "Usage: x-textmate-perl-completions [-f filename] word_to_complete\n" }
 my ($word, $file, $debug);
@@ -155,6 +156,29 @@ if ($file && $file =~ /[.]pm$/) {
 
   $module =~ s/\//::/g;
   push @modules, $module;
+}
+
+
+## Add nearby packages
+if ($file && $file =~ /[.](pm|t)$/) {
+  my ($root) = $file =~ m!^(.+)/((t)|(t/tlib)|(lib))/.+[.](pm|t)$!;
+
+  $root = dir($root);
+  for my $lib ($root->subdir('lib'), $root->subdir('t', 'tlib')) {
+    next unless -d "$lib";
+    $lib->recurse(
+      callback => sub {
+        my ($f) = @_;
+        return if $f->is_dir;
+        return unless $f->basename =~ /[.]pm$/;
+
+        my $fn = $f->relative($lib)->stringify;
+        $fn =~ s/[.]pm$//;
+        $fn =~ s/\//::/g;
+        push @completions, $fn;
+      }
+    );
+  }
 }
 
 
