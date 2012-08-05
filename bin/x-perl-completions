@@ -114,6 +114,7 @@ if ($file && $file =~ /[.]t$/) {
 
     like_string
   );
+  push @completions, 'done_testing();';
 }
 
 
