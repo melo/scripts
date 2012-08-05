@@ -10,6 +10,7 @@ use Text::Autoformat;
 
 my $text = do { local $/; <> };
 my $preamble;
+my %opts;
 
 if (my $filename = $ENV{TM_FILENAME}) {
   ## FIXME: use mime::types to fetch the content-type and use that to
@@ -17,8 +18,9 @@ if (my $filename = $ENV{TM_FILENAME}) {
   if ($filename =~ m/[.]m?md/) {    ## MultiMarkdown, skip the metadata
     ($preamble, $text) = split(/\n\n/, $text, 2);
     $preamble .= "\n\n";
+    $opts{ignore} = qr{^![.a-z]*>\s+};
   }
 }
 
 print $preamble if $preamble;
-print autoformat($text, {all => 1});
+print autoformat($text, {all => 1, %opts});
