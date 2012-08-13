@@ -13,7 +13,7 @@ my %cfg = (
   verbose => 0,
   quiet   => 0,
 );
-my $ok = GetOptions(\%cfg, "help", "verbose+", "quiet", "dryrun|n");
+my $ok = GetOptions(\%cfg, "help", "verbose+", "quiet", "completion", "dryrun|n");
 usage() unless $ok;
 usage() if $cfg{help};
 
