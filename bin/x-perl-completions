@@ -161,7 +161,7 @@ if ($file && $file =~ /[.]pm$/) {
 
 ## Add nearby packages
 if ($file && $file =~ /[.](pm|t)$/) {
-  my ($root) = $file =~ m!^(.+)/((t)|(t/tlib)|(lib))/.+[.](pm|t)$!;
+  my ($root) = $file =~ m!^(.+)/(t|lib)/.+[.](pm|t)$!;
 
   $root = dir($root);
   for my $lib ($root->subdir('lib'), $root->subdir('t', 'tlib')) {
