@@ -285,6 +285,8 @@ sub notify {
   my ($cfg, $message, $proj, $env) = @_;
 
   return if $cfg->{dryrun};
+  return unless $cfg->{notify};
+
   my $pid = fork();
   fatal("Could not fork(), could not notify: $!") unless defined $pid;
   return if $pid;    ## Parent leaves
