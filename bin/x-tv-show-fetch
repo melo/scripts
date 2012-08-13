@@ -3,32 +3,98 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use LWP::UserAgent;
+use HTTP::Tiny;
+use HTTP::Headers;
+use Time::HiRes qw( gettimeofday tv_interval );
 
-my %opts = load_config();
-GetOptions(\%opts, 'user=s', 'password=s') or usage(2);
-usage() unless $opts{user} && $opts{password} && $opts{password};
-usage() unless @ARGV;
+my $opts = load_config();
+my $ua   = build_user_agent($opts);
 
-my $base = "http://$opts{user}:$opts{password}\@$opts{host}/series";
+for my $e (<>) {
+  chomp $e;
+  next if $e =~ /^\s*$/ or $e =~ /^\s*#/;
 
-@ARGV = grep { $_ } map { s/^\s+|\s+$//g; $_ } grep { /^[^#]/ } <STDIN>
-  if $ARGV[0] eq '-';
+  $e =~ s/^\s+|\s+$//g;
 
-for my $e (@ARGV) {
-  my ($show, $season) = $e =~ m/(.+)-(\d+)x/;
-
-  fetch($e, "$base/$show/season_$season/$e");
+  my ($force) = $e =~ s/^(!)//g;
+  my ($show, $season) = $e =~ m/(.+?)-(?:(\d+)x)?/;
+  if ($season) {
+    fetch($ua, $opts, $e, $show, $season, $force);
+  }
+  else {
+    print "Unrecognized show '$e'\n";
+  }
 }
 
 sub fetch {
-  print "\n*** Fetching $_[-1]\n";
-  system(qw(curl -L -C - -O ), $_[-1]);
+  my ($ua, $opts, $file, $show, $season, $force) = @_;
+  my $dest = "$show/$file";
+
+  if (-e $dest && -z $dest) {
+    unlink($dest);
+  }
+  ## Ignore already downloaded files
+  elsif (!$force && file_done($file)) {
+    print "File '$file' already downloaded\n";
+    return;
+  }
+
+  ## Prepare destination file
+  mkdir($show) unless -d $show;
+#  open(my $fh, '>', $dest) || die "Could not open '$dest' for writting: $!";
+
+  ## Mirror URL
+  my $url = "http://$opts->{host}/series/$show/season_$season/$file";
+
+  local $| = 1;
+  print "Fetching '$file' info '$dest'\n";
+
+  my $t0    = [gettimeofday()];
+  my $res = system('curl', '--remote-time', '--connect-timeout', '5', '-C', '-', '--create-dirs', '--fail', '--output', $dest, '--user', "$opts->{user}:$opts->{password}", $url);
+  my $delta = tv_interval($t0);
+
+  if ($res == 0) {
+    file_done($file, 1);
+    my $speed = (-s $dest) / 1024 / 1024 * 8 / $delta;
+    printf('Done, took %d mins, %d secs (speed %0.3fMbps)%s', int($delta / 60), ($delta % 60), $speed, "\n");
+  }
+  else { print ": failed to download - $res\n" }
+}
+
+sub file_done {
+  my ($file, $finished) = @_;
+  my $prefix = '.done';
+
+  mkdir($prefix) unless -d $prefix;
+  $file = "$prefix/$file";
+
+  if ($finished) {
+    open(my $fh, '>', $file);
+    close($fh);
+    return;
+  }
+
+  return 1 if -f $file;
+  return;
+}
+
+sub build_user_agent {
+  my ($opts) = @_;
+
+  my %hdrs;
+  my $h = HTTP::Headers->new;
+  $h->authorization_basic($opts->{user} => $opts->{password});
+  $h->scan(sub { $hdrs{ $_[0] } = $_[1] });
+
+  return HTTP::Tiny->new(
+    timeout         => 5,
+    default_headers => \%hdrs,
+  );
 }
 
 sub usage {
   print STDERR <<EOUSAGE;
-Usage: fetch.pl -u <user> -p <password> episode+
+Usage: x-tv-show-fetch -h host -u <user> -p <password> file_of_episodes
 
 Don't forget to create a ~/.tvshows_rc file like this:
 
@@ -47,7 +113,7 @@ EOUSAGE
 }
 
 sub load_config {
-  my $opts;
+  my %opts;
 
   my $file = "$ENV{HOME}/.tvshows_rc";
   open(my $cfg, '<', $file) || return;
@@ -59,12 +125,15 @@ sub load_config {
 
     my ($command, $value) = $l =~ /^(\S+)(?:\s+(.+))?$/;
     die "Unparseable line $. on $file: $l\n" unless $command;
-    
+
     $value = '' unless defined $value;
     $value =~ s/^(["'])(.*)\1$/$2/;
 
     $opts{$command} = $value;
   }
 
-  return %opts;
+  GetOptions(\%opts, 'user=s', 'password=s', 'host=s') or usage(2);
+  usage() unless $opts{user} && $opts{password} && $opts{host};
+
+  return \%opts;
 }
