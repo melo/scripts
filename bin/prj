@@ -56,7 +56,7 @@ sub deploy {
   my $pname = $pcfg->{project}{name} || (find_project_root())[-1];
 
   usage('Deploy requires an environment as parameter.',
-    'Valid values are: ' . join(', ', sort keys %{$pcfg->{environments}}))
+    'Valid values are: ' . join(', ', sort keys %{ $pcfg->{environments} }))
     unless defined $env;
 
   ### Decide which environment to use
@@ -81,7 +81,7 @@ sub deploy {
   push @$rsync, "$cfg->{root}/";
 
   ### Hosts to use
-  my @hosts = @{$ecfg->{hosts} || []};
+  my @hosts = @{ $ecfg->{hosts} || [] };
   push @hosts, $ecfg if $ecfg->{host};
   fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg")
     unless @hosts;
@@ -125,8 +125,7 @@ sub deploy {
       push(@cmd, '-v') if $cfg->{verbose} || $pcfg->{verbose};
       push(@cmd, '-l', $host->{user}) if $host->{user};
       push(@cmd, '-p', $host->{port}) if $host->{port};
-      push @cmd,
-        "cd " . ($host->{path} || $ecfg->{path}) . " && $ecfg->{post_deploy}";
+      push @cmd, "cd " . ($host->{path} || $ecfg->{path}) . " && $ecfg->{post_deploy}";
 
       debug('Post deploy command:', \@cmd);
       system(@cmd) unless $cfg{dryrun};
@@ -147,7 +146,7 @@ sub environments {
   }
 
   my $pcfg = $cfg->{project};
-  $pretty->($_) for sort keys %{$pcfg->{environments}};
+  $pretty->($_) for sort keys %{ $pcfg->{environments} };
 }
 
 sub setup_bash_completion {
@@ -288,7 +287,7 @@ sub notify {
   return if $cfg->{dryrun};
   my $pid = fork();
   fatal("Could not fork(), could not notify: $!") unless defined $pid;
-  return if $pid;  ## Parent leaves
+  return if $pid;    ## Parent leaves
 
   ## Child tries to notify
   eval { require WebService::Notifo };
