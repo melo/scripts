@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Check a hostname on all Zerigo nameservers
+#
+# Usefull to track down delays with their dyndns updates, sometimes one
+# or two servers are not updated as fast as the others.
+#
+
+if [ -z "$*" ] ; then
+  echo "Usage: x-dns-zerigo-check host_to_check"
+  exit 1
+fi
+
+for i in a b c d e f ; do
+  dig "$@" @${i}.ns.zerigo.net |
+    ZHOST=$i perl -ne 'next unless /^;; ANSWER SECTION/ .. /^;; (?!ANSWER)/; next if /^(;;.+)?$/; print "$ENV{ZHOST}: $_"'
+done
