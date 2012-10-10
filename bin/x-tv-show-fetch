@@ -56,7 +56,7 @@ sub fetch {
   if ($res == 0) {
     file_done($file, 1);
     my $speed = (-s $dest) / 1024 / 1024 * 8 / $delta;
-    printf('Done, took %d mins, %d secs (speed %0.3fMbps)%s', int($delta / 60), ($delta % 60), $speed, "\n");
+    printf('Done, took %d mins, %d secs (speed %0.3fMbps) to download %s%s', int($delta / 60), ($delta % 60), $speed, $file, "\n");
   }
   else { print ": failed to download - $res\n" }
 }
