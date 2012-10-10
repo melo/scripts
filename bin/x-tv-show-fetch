@@ -17,7 +17,7 @@ for my $e (<>) {
   $e =~ s/^\s+|\s+$//g;
 
   my ($force) = $e =~ s/^(!)//g;
-  my ($show, $season) = $e =~ m/(.+?)-(?:(\d+)x)?/;
+  my ($show, $season) = $e =~ m/(.+?)-(?:((webisode-)?\d+)x)?/;
   if ($season) {
     fetch($ua, $opts, $e, $show, $season, $force);
   }
