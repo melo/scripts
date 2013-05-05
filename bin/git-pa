@@ -8,6 +8,9 @@
 
 
 for remote in `git remote` ; do
-  printf "*** $remote: "
-  git push $remote $@
+  echo "*** Updating $remote"
+  echo "....... pushing all refs"
+  git push --all $remote
+  echo "....... pushing all tags"
+  git push --tags $remote
 done
