@@ -36,26 +36,17 @@ if [ "$1" == "-t" ] ; then
   run_tests=yes
 fi
 
-echo
-echo "This script will pull the lastest git.git master branch, recompile,"
-echo "install and activate."
-echo
-echo "Sure? [y/N]"
+if [ -z "$DOIT" ] ; then
+  echo
+  echo "This script will pull the lastest git.git master branch, recompile,"
+  echo "install and activate."
+  echo
+  echo "Sure? [y/N]"
 
-read confirmation
+  read confirmation
 
-if [ "$confirmation" != "y" ] ; then exit ; fi
-
-for repo in git-htmldocs git-manpages ; do
-  (
-    cd $repo
-    git reset --hard
-    git fetch
-    git merge --ff --no-edit origin/master
-  )
-done
-
-cd core
+  if [ "$confirmation" != "y" ] ; then exit ; fi
+fi
 
 if [ -e configure ] ; then
   make distclean
