@@ -244,37 +244,39 @@ sub _log {
 
 sub load_cfg {
   my ($cfg) = @_;
-  my $root = $cfg{root} ||= find_project_root();
-  my $prj_cfg;
+  my @subdirs = ([], ['devops'], ['dev', 'ops', 'etc']);
+  my $root = $cfg{root} ||= find_project_root(@subdirs);
 
-  if (open(my $fh, '<', catfile($root, 'rules.prj'))) {
+  for my $subdir (@subdirs) {
+    my $filename = catfile($root, @$subdir, 'rules.prj');
+    next unless open(my $fh, '<', $filename);
     local $/;
-    $prj_cfg = decode_json(<$fh>);
+    $cfg->{project} = decode_json(<$fh>);
     close($fh);
-  }
-  else {
-    fatal("Could not open 'rules.prj' file in $root: $!");
+    return;
   }
 
-  $cfg->{project} = $prj_cfg;
+  fatal("Could not open 'rules.prj' file on these directories: " . join(', ', map { catdir($root, @$_) } @subdirs));
 }
 
 sub find_project_root {
+  my @subdirs = @_;
+
   my $project_root;
 
   my @cwd = splitdir(getcwd());
   do {
     my $cwd = catdir(@cwd);
 
-    if (-e catfile($cwd, 'rules.prj')) {
-      $project_root = $cwd;
+    for my $subdir (@subdirs) {
+      $project_root = $cwd if -e catfile($cwd, @$subdir, 'rules.prj');
     }
-    elsif ($cwd eq $ENV{HOME} || scalar(@cwd) == 1) {
-      fatal("Could not find project root (was looking for rules.prj)");
-    }
-    else {
-      pop @cwd;
-    }
+
+    fatal("Could not find project root (was looking for rules.prj in "
+        . join(', ', map { catdir('CWD', @$_) } @subdirs) . ")")
+      if !$project_root and ($cwd eq $ENV{HOME} or scalar(@cwd) == 1);
+
+    pop @cwd;
   } while (!$project_root);
 
   return @cwd if wantarray;
