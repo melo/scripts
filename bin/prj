@@ -105,6 +105,16 @@ sub deploy {
   system('git show HEAD >> .release');
   do { my $fh; open($fh, '>', '.deployed_env') and print $fh $env };
 
+  ## run pre-deploy script
+  if (exists $ecfg->{pre_deploy}) {
+    my @cmd = ($ecfg->{pre_deploy});
+
+    debug('Pre deploy command:', \@cmd);
+    unless ($cfg{dryrun}) {
+      system(@cmd) and die "FATAL: pre_deploy script failed\n";
+    }
+  }
+
   ### rsync to each one
   foreach my $host (@hosts) {
     fatal("Env '$env' with missing 'host'") unless $host->{host};
