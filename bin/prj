@@ -143,6 +143,16 @@ sub deploy {
     }
   }
 
+  ## run cleanup-deploy script
+  if (exists $ecfg->{cleanup_deploy}) {
+    my @cmd = ($ecfg->{cleanup_deploy});
+
+    debug('Cleanup deploy command:', \@cmd);
+    unless ($cfg{dryrun}) {
+      system(@cmd) and die "FATAL: cleanup_deploy script failed\n";
+    }
+  }
+
   notify($cfg, "Sucessfully deployed '$env' for project '$pname'", $pname, $env);
   return;
 }
