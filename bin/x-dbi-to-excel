@@ -1,0 +1,58 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use DBI;
+use Excel::Writer::XLSX;
+
+
+my ($file, $dsn, $user, $pass, $query, @params) = @ARGV;
+if (!$file || !$dsn || !$user || length($pass) || !$query) {
+  die "Usage: x-dbi-to-excel FILENAME DSN USER PASS SQL [bind params]\n";
+}
+
+map { $_ = undef if $_ && $_ eq 'NULL' } @params;
+
+if (!$query) {
+  my $in_query = 1;
+  while (<STDIN>) {
+    chomp($_);
+    if ($in_query) {
+      if (!$_) { $in_query = 0; }
+      else     { $query .= $_; }
+      next;
+    }
+    push @params, $_;
+  }
+}
+
+my $dbh = DBI->connect($dsn, $user, $pass, { RaiseError => 1 }) || die $DBI::errstr;
+my $stm = $dbh->prepare($query);
+$stm->execute(@params);
+
+my ($wrk, $sheet) = create_excel_file($file);
+my $col = 0;
+$sheet->write(0, $col++, $_) for @{ $stm->{NAME_uc} };
+
+my $row = 1;
+while (my @row = $stm->fetchrow_array) {
+  $col = 0;
+  $sheet->write($row, $col++, $_) for @row;
+  $row++;
+}
+
+$stm->finish;
+$dbh->disconnect;
+$wrk->close;
+
+
+sub create_excel_file {
+  my ($filename) = @_;
+
+  my $wrk   = Excel::Writer::XLSX->new($filename);
+  my $sheet = $wrk->add_worksheet();
+
+  return ($wrk, $sheet);
+}
+
+
