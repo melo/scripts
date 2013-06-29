@@ -17,6 +17,9 @@ my $ok = GetOptions(\%cfg, "help", "verbose+", "quiet", "completion", "dryrun|n"
 usage() unless $ok;
 usage() if $cfg{help};
 
+my @rules_prj_locations = ([], ['devops'], ['dev', 'ops', 'etc']);
+
+
 dispatch_command(\%cfg, @ARGV);
 
 
@@ -265,10 +268,9 @@ sub _log {
 
 sub load_cfg {
   my ($cfg) = @_;
-  my @subdirs = ([], ['devops'], ['dev', 'ops', 'etc']);
-  my $root = $cfg{root} ||= find_project_root(@subdirs);
+  my $root = $cfg{root} ||= find_project_root();
 
-  for my $subdir (@subdirs) {
+  for my $subdir (@rules_prj_locations) {
     my $filename = catfile($root, @$subdir, 'rules.prj');
     next unless open(my $fh, '<', $filename);
     local $/;
@@ -277,24 +279,22 @@ sub load_cfg {
     return;
   }
 
-  fatal("Could not open 'rules.prj' file on these directories: " . join(', ', map { catdir($root, @$_) } @subdirs));
+  fatal("Could not open 'rules.prj' file on these directories: " . join(', ', map { catdir($root, @$_) } @rules_prj_locations));
 }
 
 sub find_project_root {
-  my @subdirs = @_;
-
   my $project_root;
 
   my @cwd = splitdir(getcwd());
   do {
     my $cwd = catdir(@cwd);
 
-    for my $subdir (@subdirs) {
+    for my $subdir (@rules_prj_locations) {
       $project_root = $cwd if -e catfile($cwd, @$subdir, 'rules.prj');
     }
 
     fatal("Could not find project root (was looking for rules.prj in "
-        . join(', ', map { catdir('CWD', @$_) } @subdirs) . ")")
+        . join(', ', map { catdir('CWD', @$_) } @rules_prj_locations) . ")")
       if !$project_root and ($cwd eq $ENV{HOME} or scalar(@cwd) == 1);
 
     pop @cwd;
