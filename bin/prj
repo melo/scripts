@@ -119,19 +119,31 @@ sub deploy {
   }
 
   ### rsync to each one
+  info("Deploying project");
   foreach my $host (@hosts) {
     fatal("Env '$env' with missing 'host'") unless $host->{host};
 
-    my @cmd = @$rsync;
+    my @cmd  = @$rsync;
+    my $info = $host->{host};
 
     ### prepare the SSH transport settings
     push @cmd, '-e', 'ssh';
-    $cmd[-1] .= " -l $host->{user}" if $host->{user};
-    $cmd[-1] .= " -p $host->{port}" if $host->{port};
+    if ($host->{user}) {
+      $cmd[-1] .= " -l $host->{user}";
+      $info = "$host->{user}\@$info";
+    }
+    if ($host->{port}) {
+      $cmd[-1] .= " -p $host->{port}";
+      $info .= ":$host->{port}";
+    }
+    $info = "host '$info'";
 
-    push @cmd, join(':', $host->{host}, ($host->{path} || $ecfg->{path}));
+    my $path = $host->{path} || $ecfg->{path};
+    push @cmd, join(':', $host->{host}, $path);
+    $info .= ", path '$path'";
 
     debug('Rsync command:', \@cmd);
+    info(".... deploy to $info");
     system(@cmd) unless $cfg{dryrun};
 
     if (exists $ecfg->{post_deploy}) {
@@ -237,6 +249,11 @@ EOU
 
 ########
 # Logger
+
+sub info {
+  return if $cfg{quiet};
+  return _log('INFO', @_);
+}
 
 sub debug {
   return if $cfg{quiet};
