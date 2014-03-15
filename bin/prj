@@ -8,6 +8,7 @@ use JSON;
 use Getopt::Long;
 use Data::Dump ();
 use DateTime;
+use HTTP::Tiny;
 
 my %cfg = (
   verbose => 0,
@@ -331,9 +332,10 @@ sub notify {
   my ($cfg, $message, $proj, $env) = @_;
 
   return if $cfg->{dryrun};
-  return unless exists $cfg->{notify};
 
-  my $ncfg = $cfg->{notify};
+  my $ncfg = $cfg->{project}{environments}{$env}{notify};
+  return unless $ncfg;
+
   $ncfg = { growlnotify => 1 } if $ncfg and not ref($ncfg);
 
   if ($ncfg->{growlnotify}) {
@@ -345,7 +347,29 @@ sub notify {
     }
   }
 
+  notify_hipchat($ncfg->{hipchat}, $cfg, $message, $proj, $env) if $ncfg->{hipchat};
+
   return;
+}
+
+sub notify_hipchat {
+  my ($hcfg, $cfg, $msg, $prod, $env) = @_;
+
+  my $ua  = _ua();
+  my $res = $ua->post_form(
+    'https://api.hipchat.com/v1/rooms/message?format=json&auth_token=' . $hcfg->{token},
+    { room_id        => $hcfg->{room_id},
+      from           => 'prj cmd line',
+      message        => "$msg (by $ENV{USER})",
+      message_format => 'text',
+      notify => exists $hcfg->{notify_room} ? $hcfg->{notify_room} : 1,
+    }
+  );
+  if ($res->{status} == 200) {
+    my $answer = eval { decode_json($res->{content}) };
+    return if $answer and $answer->{status} eq 'sent';
+  }
+  error("Failed to notify hipchat: $res->{status} - $res->{content}");
 }
 
 sub is_tty { return -t \*STDOUT }
@@ -364,6 +388,10 @@ sub _has_cmd {
 
 ############
 # Operations
+
+sub _ua {
+  return HTTP::Tiny->new(agent => 'prj deploy tool/0.01');
+}
 
 sub _tag_release {
   my ($env) = @_;
