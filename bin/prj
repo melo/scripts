@@ -296,7 +296,8 @@ sub load_cfg {
     return;
   }
 
-  fatal("Could not open 'rules.prj' file on these directories: " . join(', ', map { catdir($root, @$_) } @rules_prj_locations));
+  fatal("Could not open 'rules.prj' file on these directories: "
+      . join(', ', map { catdir($root, @$_) } @rules_prj_locations));
 }
 
 sub find_project_root {
