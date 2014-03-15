@@ -262,6 +262,11 @@ sub debug {
   return _log('DEBUG', @_);
 }
 
+sub error {
+  return if $cfg{quiet};
+  return _log('ERROR', @_);
+}
+
 sub fatal {
   _log('FATAL', @_);
   exit(1);
@@ -326,24 +331,18 @@ sub notify {
   my ($cfg, $message, $proj, $env) = @_;
 
   return if $cfg->{dryrun};
-  return unless $cfg->{notify};
+  return unless exists $cfg->{notify};
 
-  my $pid = fork();
-  fatal("Could not fork(), could not notify: $!") unless defined $pid;
-  return if $pid;    ## Parent leaves
+  my $ncfg = $cfg->{notify};
+  $ncfg = { growlnotify => 1 } if $ncfg and not ref($ncfg);
 
-  ## Child tries to notify
-  eval { require WebService::Notifo };
-  if (!$@) {
-    my $n = WebService::Notifo->new;
-    $n->send_notification(
-      label => 'prj',
-      title => "$proj ($env)",
-      msg   => $message
-    );
-  }
-  elsif (my $gn = _has_cmd('growlnotify')) {
-    system($gn, '-m', $message, 'prj deploy status');
+  if ($ncfg->{growlnotify}) {
+    if (my $gn = _has_cmd('growlnotify')) {
+      system($gn, '-m', $message, 'prj deploy status');
+    }
+    else {
+      error('Could not find growlnotify command line tool');
+    }
   }
 
   return;
