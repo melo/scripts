@@ -1,0 +1,110 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Mac::FSEvents;
+use IO::Select;
+use Getopt::Long;
+use File::Spec::Functions qw( catfile );
+use File::HomeDir;
+
+my $opt_once;
+my $opt_clear;
+my $opt_script;
+my $opt_paths;
+my $ok = GetOptions(
+  'once'     => \$opt_once,
+  'clear'    => \$opt_clear,
+  'script=s' => \$opt_script,
+  'path=s@' => \@opt_paths,
+  'verbose'  => \$opt_verbose,
+);
+usage() unless $ok;
+
+my @args = @ARGV;
+if ($opt_script) {
+  my $path = catfile(File::HomeDir->my_home, '.file-watchers.d', $script);
+  usage(1, "Script '~/.file-watchers.d/$script' not found or not executable")
+    unless -e $path && -x _;
+  unshift @args, $path;
+}
+
+usage(1, "A command_to_execute is required") unless @args;
+
+run_command(@args) if $opt_once;
+
+my %fh_map;
+my $sel = IO::Select->new;
+
+@opt_paths = ('.') unless @opt_paths;
+for my $path (@opt_paths) {
+  my $fs = Mac::FSEvents->new({
+    path    => $path,
+    latency => 1.0,
+  });
+  my $fh = $fs->watch;
+  $sel->add($fh);
+  $fh_map{$fh} = $fs;
+}
+
+while (my @fhs = $sel->can_read) {
+  my $count = 0;
+  $count += $fh_map{$_}->read_events for @fhs;
+
+  run_command(@args) if $count;
+}
+
+exit(0);
+
+END { map { $_->stop } keys %fh_map }
+
+
+### Run the command
+sub run_command {
+  system('/usr/bin/clear') if $opt_clear;
+  system(@_);
+  print STDERR "Executed: ", join(' ', @_), "\n" if $opt_verbose;
+}
+
+
+### Usage stuff
+sub usage {
+  my ($code, $mesg) = @_;
+  
+  print STDERR <<'...';
+Usage: x-watch-fs [options] [command_to_run]
+
+  This utility watches the files and/or directories for modifications
+  If any modification is detected, a command is executed.
+
+  If --clear is present, we run /usr/bin/clear before the command
+  execution.
+
+  The command can be given in two ways: using the --script NAME, or
+  on the command line.
+
+  Options:
+  
+    --script NAME or -s NAME
+        executes ~/.fs-watcher.d/NAME; exits if not found
+    --clear
+        executes /usr/bin/clear before the command execution
+    --once
+        executes the command once before starting to watch the files/directories
+    --path
+        declares with files or directories should be watched; defaults
+        to "." (current directory); can be used multiple times.
+
+  An usual use case is:
+
+    x-watch-fs --path t --path lib -- prove -l -v t
+
+  You need -- to split the arguments for this script and the
+  arguments for the command to execute.
+
+...
+
+  print STDERR "FATAL: $mesg\n\n" if $mesg;
+  
+  exit($code || 2);
+}
