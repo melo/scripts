@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+setup_config("$ENV{HOME}/.aws/config");
+exec(@ARGV);
+
+sub setup_config {
+  open(my $fh, '<', $_[0]) or return;
+
+  ## Find the profile you want
+  while (<$fh>) { last if m/^\s*\[default\]/ }
+
+  ## read all the vars
+  my %vars;
+  while (<$fh>) {
+    next if m/^\s*#/;
+    last if m/^\s*\[/;
+
+    chomp;
+    $vars{$1} = $2 if m{^\s*(\S+)\s*=\s*(.*?)\s*$};
+  }
+
+  return unless $vars{aws_access_key_id} and $vars{aws_secret_access_key};
+
+  $ENV{AWS_ACCESS_KEY_ID}     = $vars{aws_access_key_id};
+  $ENV{AWS_SECRET_ACCESS_KEY} = $vars{aws_secret_access_key};
+  $ENV{AWS_DEFAULT_REGION}    = $vars{region} if $vars{region};
+
+  return;
+}
