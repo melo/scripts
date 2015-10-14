@@ -33,11 +33,16 @@ sub _exec_cmd {
   if (-f 'cpanfile.snapshot' and -d 'local' and !$ENV{R_CARTON_EXEC_DONE}) {
     $ENV{R_CARTON_EXEC_DONE} = 1;    ## use Carton exec once only!
     unshift @ARGV, qw(carton exec), $0;
+    warn "Using Carton!\n" if $ENV{R_DEBUG};
   }
   else {
+    warn "Seting up PERL5LIB for '$dir'\n" if $ENV{R_DEBUG};
     $ENV{PERL5LIB} = join(':', _find_libs($dir), split(/:/, $ENV{PERL5LIB} || ''));
+    warn "Set to PERL5LIB: $ENV{PERL5LIB}\n" if $ENV{R_DEBUG};
   }
 
+  warn "Exec'ing: @ARGV\n" if $ENV{R_DEBUG};
+  warn "... with PERL5LIB: $ENV{PERL5LIB}\n" if $ENV{R_DEBUG};
   exec(@ARGV);
   die "Failed to exec '@ARGV': $!";
 }
@@ -51,6 +56,7 @@ sub _find_libs {
   my @found;
   while (my $dir = shift @dirs) {
     my $l = catdir($dir, 'lib');
+    warn "Check '$dir' for 'lib/'\n" if $ENV{R_DEBUG};
     push @found, $l if -d $l;
 
     my $elibs = catdir($dir, 'elib');
