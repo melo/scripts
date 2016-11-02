@@ -1,0 +1,13 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+binmode(\*STDOUT, ':utf8');
+
+print "Type the hex value of the unicode char you want to see. ^D to exit.\n";
+
+while (<>) {
+  chomp;
+  eval "print \"$_ => '\\x{$_}'\\n\"";
+}
