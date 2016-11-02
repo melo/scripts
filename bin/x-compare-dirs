@@ -1,0 +1,40 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Path::Class 'dir';
+use Digest::SHA1 ();
+
+my ($work, $common) = map { dir($_) } @ARGV[0..1];
+
+$work->recurse(depthfirst => 1, preorder => 0, callback => sub {
+  my ($item) = @_;
+
+  ## Try to remove directory, might be empty
+  if ($item->is_dir) {
+    print "rmdir $item\n";
+    return;
+  }
+  
+  ## Equiv file on common not found => keep ours
+  my $dest = $common->file($item->relative($work));
+  unless (-e $dest) {
+    print "cp $item $common/$item\n";
+    return;
+  }
+  
+  ## Digest both files
+  my $src_h = Digest::SHA1->new;
+  $src_h->addfile($item->openr);
+  my $dst_h = Digest::SHA1->new;
+  $dst_h->addfile($dest->openr);
+
+  ## Remove source file if we have a match
+  if ($dst_h->digest eq $src_h->digest) {
+    print "rm $item\n" ;
+  }
+  else {
+    print "open $item $common/$item\n";
+    print "echo different $item\n" ;
+  }
+});
