@@ -1,0 +1,52 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+use utf8;
+
+binmode(\*STDOUT, ':utf8');
+
+my %args;
+my $ok = GetOptions(\%args,
+  qw( db=s user=s password=s deploy ));
+
+my $db = $args{db};
+
+usage() unless $ok;
+#usage() unless $db;
+
+#$db = "dbi:mysql:$db" unless $db =~ /^dbi:/;
+
+my $dbh;
+
+
+
+load_todos_cp();
+
+
+sub load_todos_cp {
+  open(my $fh, '<', 'todos_cp.txt') or die "Could not find file 'todos_cp.txt', ";
+  
+  while (my $row = <$fh>) {
+    chomp($row);
+    my ($d_id, $c_id, $l_id, $l, $a_id, $a_tipo, $a_pp, $a_t, $a_sp, $a_d, $a_l, $a_tr, $a_p, $cln, $cp4, $cp3, $cpa) = split(/;/, $row);
+    print "$cp4\n" if $d_id == 1 || $d_id == 06 || $d_id == 10;
+#    print "$cp4-$cp3: $cln\n" if $cln;
+  }
+}
+
+
+sub deploy {
+  $dbh->do(q{
+    CREATE TABLE cod_postal (
+      id            integer not null primary key auto_increment,
+      distrito_id   byte not null,
+      concelho_id   byte not null,
+      localidade_id integer not null,
+      
+      localidade varchar(100) not null,
+      
+    )
+  })
+}
