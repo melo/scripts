@@ -1,0 +1,19 @@
+#!/usr/bin/env perl
+
+use: 5.14;
+use MIME::Parser;
+
+my ($mesg) = @ARGV;
+
+die "Usage: x-mime-expload message.mbox\n" unless defined $mesg;
+die "FATAL: cannot read $mesg\n" unless -r $mesg;
+
+my $parser = MIME::Parser->new;
+$parser->output_under('.');
+$parser->output_prefix('mime-exploder');
+$parser->extract_uuencode(1);
+$parser->ignore_errors(0);
+
+my $entity;
+eval { $entity = $parser->parse_open($mesg) };
+die "FATAL: $@ - ".$parser->last_error."\n" if $@;
