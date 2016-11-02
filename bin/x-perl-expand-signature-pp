@@ -1,0 +1,104 @@
+#!/usr/bin/env perl
+
+
+#### RE's
+
+my $decl_re = qr/
+  ^
+  \s*
+  (method|func)
+  \s*
+  ([\w_]+)
+  \s*
+  [(]
+  (.+?)
+  [)]
+  \s*
+  [{]
+  $
+/x;
+
+my $match_self_name = qr/
+  \s*
+  \$
+  ([\w_]+)
+  :
+  \s*
+  ,?
+  \s*
+/x;
+
+my $match_pos_protos = qr/
+  \s*
+  \$
+  ([\w_]+)
+  \s*
+  (\?)?
+  \s*
+  ,?
+  \s*
+/x;
+
+my $match_named_protos = qr/
+  \s*
+  :
+  \$
+  ([\w_]+)
+  \s*
+  (?:
+    =
+    \s*
+    (
+      (?:
+        ["']
+        .*?
+        ['"]
+      )
+      |
+      (?:
+        [{\]]
+        .*?
+        [}\]]
+      )
+      |
+      (?:
+        [^,]*
+      )
+    )
+    \s*
+  )?
+  \s*
+  ,?
+  \s*
+/x;
+
+
+#### Code
+
+my $decl = do { local $\; <> };
+my ($type, $name, $proto) = $decl =~ m/$decl_re/;
+my @perl = ("sub $name {");
+
+if ($type eq 'method') {
+  if ($proto =~ s/^$match_self_name//) {
+    push @perl, "  my \$$1 = shift;";
+  }
+  else {
+    push @perl, '  my $self = shift;';
+  }
+}
+
+## collect fixed pos args
+my @fixed;
+while ($proto =~ s/^$match_pos_protos//) {
+  
+}
+
+## collect named args
+my @named;
+while ($proto =~ s/^$match_named_protos//) {
+  push @named, { name => $1, default => $2};
+}
+
+print "# $decl\n", join("\n", @perl), "\n";
+use Data::Dump qw(pp); print "proto '$proto' = ", pp(\@named), "\n";
