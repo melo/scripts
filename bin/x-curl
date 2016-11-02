@@ -1,0 +1,3 @@
+#/bin/sh
+
+exec curl --write-out "%{url_effective}: %{http_code} time: %{time_total} (DNS %{time_namelookup}, Connct: %{time_connect}, SSL: %{time_appconnect}, Sent: %{time_pretransfer}, First: %{time_starttransfer}) size %{size_download} (headers %{size_header}) avg speed: %{speed_download}\n" -o /dev/null --silent "$@"
