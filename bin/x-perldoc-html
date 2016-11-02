@@ -1,0 +1,10 @@
+#!/bin/sh
+
+tmp=`mktemp -t perldoc-html`.html
+
+perldoc -oHTML $@ > $tmp
+if [ -s "$tmp" ] ; then
+  open -a Safari $tmp
+fi
+
+( sleep 2 ; rm -f $tmp ) &
