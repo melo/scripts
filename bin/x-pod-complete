@@ -1,0 +1,39 @@
+#!/usr/bin/env perl
+#
+# bash completion script for x-pod
+#
+# by Yanick
+# via http://babyl.dyndns.org/techblog/2010/01/local-pod-browsing-using-podpomweb-via-the-cli.html
+#
+# Add to your .bashrc:
+#
+#   complete -C x-pod-complete x-pod
+#
+
+use 5.010;
+use List::MoreUtils qw/ uniq /;
+
+my ( $sofar ) = reverse split ' ', $ENV{COMP_LINE};
+
+$sofar =~ s(::)(/)g;
+
+my ( $path, $file ) = $sofar =~ m!^(.*/)?(.*)?$!;
+
+my @dirs = map { $_.'/'.$path } @INC;
+
+my @candidates;
+
+for ( @dirs ) {
+    opendir my $dir, $_;
+    push @candidates, grep { /^\Q$file/ } grep { !/^\.\.?$/ } readdir $dir;
+}
+
+if ( $path ) {
+    $_ = $path.'/'.$_ for @candidates;
+}
+
+s/\.pm$// for @candidates;
+s(/+)(/)g for @candidates;
+
+say for uniq @candidates;
+
