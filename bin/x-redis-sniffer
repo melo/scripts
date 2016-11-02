@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "Redis proxy running at port 6378"
+tcpserver -RH 0 6378 recordio nc 127.0.0.1 6379
