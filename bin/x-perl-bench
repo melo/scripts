@@ -1,0 +1,110 @@
+#!/usr/bin/env perl
+#
+# Quick Perl benchmark
+#
+# TODO: write benchmark script as my_bench.pl on cwd
+#
+# Pedro Melo <melo@simplicidade.org> November 2011
+#
+
+use strict;
+use warnings;
+use Benchmark 'cmpthese';
+
+sub out;
+sub abort;
+
+my $filename;
+$filename = shift(@ARGV) if @ARGV;
+
+out "Type the Perl code for the versions you want to benchmark";
+out "Benchmark script will be written as '$filename'" if $filename;
+
+my @versions;
+while (my $version = read_version()) {
+  my $script = 'sub {' . $version->{script} . '}';
+  my $sub    = eval $script;
+  if ($@) {
+    out "Error evaluating your script: $@";
+    out "We will ignore this script, try again.";
+    next;
+  }
+  $version->{sub} = $sub;
+  push @versions, $version;
+}
+abort "We need at least one version to benchmark..." unless @versions;
+
+if ($filename) {
+  open(my $fh, '>', $filename)
+    or abort "Could not open '$filename' for writting: $!";
+  print $fh
+    "#!perl\n\nuse strict;\nuse warnings;\nuse Benchmark 'cmpthese';\n\n";
+
+  my $i = 0;
+  foreach my $v (@versions) {
+    $i++;
+    print $fh "my \$version_$i = sub {\n$v->{script}};\n\n";
+  }
+
+  print $fh "\nprint \"Starting the benchmark...\\n\";\n\ncmpthese(0, {";
+
+  $i = 0;
+  foreach my $v (@versions) {
+    $i++;
+    print $fh "  '$v->{name}' => \$version_$i,\n";
+  }
+  print $fh "});\n\n";
+  close($fh);
+
+  out "Script '$filename' generated";
+}
+else {
+  out "Starting the benchmark (this may take a while)...";
+  cmpthese(0, {map { ($_->{name} => $_->{sub}) } @versions});
+}
+
+
+###########
+# Utilities
+
+sub out {
+  return unless -t \*STDOUT;
+  print @_, "\n";
+}
+
+sub abort {
+  out @_;
+  exit(1);
+}
+
+sub read_version {
+  out
+    "Define the name for this version. Type . (dot) if no more versions are required.";
+  my $name = read_non_empty_line();
+  return if $name eq '.';
+
+  out "Write the code for '$name',\nend with a . (dot) on a single line.";
+  my $script = read_script();
+
+  return {name => $name, script => $script};
+}
+
+sub read_non_empty_line {
+  while (<>) {
+    chomp;
+    s/^\s+|\s+$//g;
+    return $_ if $_;
+  }
+  abort "Aborted...";
+}
+
+sub read_script {
+  my $script = '';
+  while (<>) {
+    chomp;
+    last if $_ eq '.';
+    $script .= $_ . "\n";
+  }
+
+  return $script;
+}
