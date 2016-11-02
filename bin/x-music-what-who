@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# hat tip to @consttype: https://twitter.com/#!/consttype/status/211035411026427904
+
+osascript -e  'tell application "iTunes" to pause'
+
+x='tell application "iTunes" to get'
+y='of current track as string'
+say Title is `osascript -e "$x name $y"` . Author is `osascript -e "$x artist $y"`
+
+osascript -e  'tell application "iTunes" to play'
