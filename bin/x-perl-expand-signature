@@ -1,0 +1,36 @@
+#!/usr/bin/env perl
+# 
+# Expand Method::Signatures declarations to the pure perl version
+#
+# A minor syntax error inside a method or a func is hard to debug. This
+# snippet accepts the method or func declaration on stdin and outputs
+# the corresponding perl to stdout.
+#
+# Pedro Melo (c) 2011 <melo@simplicidade.org>
+# 
+
+use strict;
+use warnings;
+
+my $decl = do { local $\; <> };
+my ($name) = $decl =~ m/\s*(?:method|func)\s+(\S+?)?\s*\(/;
+$name = '' unless $name;
+
+my $script = <<"EOS";
+  use Method::Signatures;
+
+  BEGIN {
+    no warnings;
+    *Method::Signatures::DEBUG = sub {
+      my (\$code) = \@_;
+      return unless \$code =~ s/^inject: //;
+      
+      print "sub $name { \$code";
+    }
+  }
+
+  $decl
+  }
+EOS
+
+eval $script;
