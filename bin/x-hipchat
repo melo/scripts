@@ -1,0 +1,68 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use JSON 'encode_json';
+use HTTP::Tiny;
+use Getopt::Long;
+use Encode 'decode';
+
+my %opts = (room => $ENV{HIPCHAT_ROOM}, notify => 1);
+GetOptions(\%opts, 'help', 'room=s', 'notify!', 'color=s', 'message_format=s') or usage();
+usage() if $opts{help};
+
+usage("room is required parameter\n") unless $opts{room};
+usage("ENV HIPCHAT_TOKEN is required\n") unless my $hipchat_token = $ENV{HIPCHAT_TOKEN};
+
+-t \*STDOUT and -t \*STDIN and print "Type your message, enter ^D to send, ^C to abort:\n";
+my $message = '';
+while (length($message) <= 10_000 and my $line = <>) { $message .= decode('UTF-8', $line) }
+
+usage("no message to send\n") unless length($message);
+usage("message to big (max 10_000 chars)\n") if length($message) > 10_000;
+
+my %body = (message => $message);
+$body{color}  = $opts{color} if $opts{color};
+$body{notify} = \1           if $opts{notify};
+$body{message_format} = $opts{message_format} || 'text';
+
+my $res = HTTP::Tiny->new(ua => 'x-hipchat ')->post(
+  "https://api.hipchat.com/v2/room/$opts{room}/notification",
+  { headers => {
+      'Authorization' => "Bearer $hipchat_token",
+      'Content-Type'  => 'application/json',
+    },
+    content => encode_json(\%body),
+  }
+);
+exit(0) if $res->{status} == 204;
+
+print "Ooops - $res->{status} $res->{reason}: $res->{content}\n";
+exit(1);
+
+
+sub usage {
+  print "ERROR: @_\n" if @_;
+
+  print <<EOF;
+Usage: x-hipchat --room=... [--color=...] [--notify]
+
+Sends stdin as message.
+
+date | x-hipchat --room=X
+ls -la | x-hipchat --room=Z
+
+Requires environment variable HIPCHAT_TOKEN. Will use HIPCHAT_ROOM if
+available as default --room parameter.
+
+EOF
+
+  exit(1) if @_;
+  exit(2);
+}
+
+BEGIN {
+  if ($ENV{FATPACKING}) {
+    eval { HTTP::Tiny->new->post('http://127.0.0.1/', { content => JSON::encode_json({}) }) };
+  }
+}
