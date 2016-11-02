@@ -1,0 +1,33 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Path::Class;
+
+my @dirs = @ARGV;
+push @dirs, '.' unless @dirs;
+
+my %modules;
+
+for my $dir (@dirs) {
+  $dir = dir($dir);
+  
+  $dir->recurse(callback => sub {
+    my ($f) = @_;
+    return if $f->is_dir;
+    return unless $f->basename =~ /\.(pm|t)$/;
+    
+    _scan_file_for_uses($f);
+  });
+}
+
+printf('% -40s = 0%s', $_, "\n") for grep { ! /^E\d?:?/ } grep { ! /^(Digito|ENG|ESP|Evolui|FAQ|EvoluiESP|MPT|LMS|Prodigio|MyTK):?/ } sort keys %modules;
+
+sub _scan_file_for_uses {
+  my $fh = shift->openr;
+  while (<$fh>) {
+    next if /^\s*use\s+(vars|utf8|lib|overload|version|strict|warnings|feature|encoding|5\.\d+)\b/;
+    print STDERR "  parse '$1'\n", next if /^\s*use\s+(?:parent|base)\b(.*);/;
+    $modules{$1}++ if /^\s*use\s+([a-zA-Z0-9:]+)/;
+  }
+}
