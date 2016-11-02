@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# via http://babyl.dyndns.org/techblog/2010/01/local-pod-browsing-using-podpomweb-via-the-cli.html
+# by Yanick
+#
+# adjusted to Mac OS X by Pedro Melo
+#
+
+POD_PORT=8787
+
+perl -MPod::POM::Web \
+   -e"Pod::POM::Web->server($POD_PORT)" 2> /dev/null &
+
+PAGE=`perl -e's(::)(/)g for @ARGV; print @ARGV' $1`
+
+open "http://127.0.0.1:$POD_PORT/$PAGE"
+
