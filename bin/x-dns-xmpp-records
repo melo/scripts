@@ -1,0 +1,18 @@
+#!/bin/sh
+
+domain=$1
+server=$2
+export domain server
+
+(
+#  echo srv _xmpp-server._tcp.$domain
+  dig srv _xmpp-server._tcp.$domain | grep -i srv
+#  echo srv _xmpp-client._tcp.$domain
+  dig srv _xmpp-client._tcp.$domain | grep -i srv
+#  echo srv _jabber._tcp.$domain
+  dig srv _jabber._tcp.$domain | grep -i srv
+#  echo srv _jabber-client._tcp.$domain
+  dig srv _jabber-client._tcp.$domain | grep -i srv
+#  echo a $domain
+  dig a $domain | D=$domain perl -ne 'print if /^$ENV{D}.*IN\s+A\s+/'
+) | perl -ne 'next if /^[;.]/ || /^[a-z].root-servers.net./ || /^\s*$/; print'
