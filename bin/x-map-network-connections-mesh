@@ -1,0 +1,302 @@
+#!/usr/bin/env perl
+#
+# Collects a lot of data to map the network connections between a set of servers
+#
+
+use strict;
+use Carp qw( croak );
+use Data::Dumper;
+use GraphViz;
+use Log::Log4perl qw(:easy);
+    Log::Log4perl->easy_init($WARN);
+
+my $map = foreach_line(\&parse_command_output);
+
+#WARN('Map after parsing is: ', Dumper($map));
+#exit(0);
+
+
+### NEXT STEPS: o pid é local ao server, por cada conn temos de ter o r_name
+# e l_name
+# uma maneira é na passagem pelo netstat manter um hash com key
+# $server:l_addr:l_port:l_proto => { pid, short_name } que depois expandimos
+# para name cruzando com o /service
+#
+
+my $g = GraphViz->new(
+  layout => 'dot',
+  node   => { shape => 'box' },
+);
+
+# Create a list of IP addresses per server
+my %ip_map = %{$map->{ip}};
+while (my ($ip, $name) = each %{$map->{ip}}) {
+  push @{$ip_map{$name}}, $ip;
+}
+
+# create a local hash with open ports on each server, and name all socket connections
+my %open_ports;
+walk(
+  $map->{netstat},
+  sub {
+    my ($item, @path) = @_;
+    my $server = $path[0];
+    
+    return unless UNIVERSAL::isa($item => 'HASH');
+    return unless $item->{pid};
+    return unless $item->{proto} eq 'tcp'; # We currently don't use UDP
+    
+    $item->{server} = $server;
+    $item->{name} = 
+        ($item->{pid} && $map->{slash_services}{$server}{$item->{pid}})
+        || $item->{short_name}
+        || '???';
+    
+    return unless exists $item->{port};
+    
+    foreach my $ip (@{$ip_map{$server}}) {
+      $open_ports{"$ip:$item->{port}:$item->{proto}"} = { item => $item, used => 0 };
+    }
+  }
+);
+
+# scan all connections, and see which ones are in use. Collect edges
+my @edges;
+my %nodes;
+walk(
+  $map->{netstat},
+  sub {
+    my ($item, @path) = @_;
+    my $server = $path[0];
+    
+    return unless UNIVERSAL::isa($item => 'HASH');
+    return unless $item->{state} eq 'ESTABLISHED';
+    return unless $item->{proto} eq 'tcp';
+    return unless exists $ip_map{$item->{l_addr}} && exists $ip_map{$item->{r_addr}};
+
+    # src, dst
+    my ($bare_server) = $item->{server} =~ m/^([^.]+)/;
+    
+    my @conn_info = (
+      {
+        key => qq{$item->{l_addr}:$item->{l_port}:$item->{proto}},
+        srv => $ip_map{$item->{l_addr}},
+        name => qq{$item->{l_name}:$item->{l_port}},
+      },
+      {
+        key => qq{$item->{r_addr}:$item->{r_port}:$item->{proto}},
+        srv => $ip_map{$item->{r_addr}},
+        name => qq{$item->{r_name}:$item->{r_port}},
+      },
+    );
+    
+    # check which side of the conn is the server, swap if need, mark server as used
+    my ($l_key, $r_key) = ($conn_info[0]{key}, $conn_info[1]{key});
+    
+    if (exists $open_ports{$l_key}) {
+      $open_ports{$l_key}{used}++;
+      ($conn_info[0], $conn_info[1]) = ($conn_info[1], $conn_info[0]); # swap direction of edge
+    }
+    elsif (exists $open_ports{$r_key}) {
+      $open_ports{$r_key}{used}++
+    }
+    else {
+      return; # this should not happen :)
+    }
+    
+    push @edges, { src => $conn_info[0]{srv} };    
+    push @{$nodes{$bare_server}{labels}}, $conn_info[1]{name};
+  }
+);
+use Data::Dumper; print STDERR ">>>>>> ", Dumper(\%nodes);
+
+# Scan ports in use: create nodes
+walk(
+  \%nodes,
+  sub {
+    my ($item, $server) = @_;
+    
+    return unless UNIVERSAL::isa($item => 'HASH');
+    return unless $item->{labels};
+
+    $g->add_node($server, headlabel => $server, label => $nodes{$server});
+  }
+);
+
+
+print $g->as_canon;
+
+##########
+# Parsing
+
+sub parse_command_output {
+  my ($line, $map) = @_;
+  
+  # ignore empty lines
+  return if $line =~ /^\s*$/;
+  
+  # ouput has section, this is the start of a section
+  if ($line =~ /^\s*--- (.+) ---/) {
+    INFO("Found section '$1'");
+    $map->{current_section} = $1;
+    return;
+  }
+  
+  # each section reports on several server
+  if ($line =~ /^Server (\S+):$/) {
+    INFO("Found server '$1'");
+    $map->{current_server} = $1;
+    return;
+  }
+  my ($server, $section) = @{$map}{qw(current_server current_section)};
+  
+  LOGCROAK("Got content line but no section active: $line") if $line && !$section;
+  LOGCROAK("Got content line but no server active: $line")  if $line && !$server;
+
+#  DEBUG("current line ($section/$server): $line");
+
+  my $l_map = $map->{$section}{$server} ||= {};
+  if    ($section eq 'interfaces')     { _parse_interfaces($line, $server, $l_map, $map); }
+  elsif ($section eq 'slash_services') { _parse_proc_names($line, $server, $l_map, $map); }
+  elsif ($section eq 'netstat')        { _parse_netstat($line, $server, $l_map, $map);    }
+}
+
+sub _parse_interfaces {
+  my ($line, $server, $map, $gmap) = @_;
+  
+  if ($line =~ /^(\S+)/) {
+    $map->{current_interface} = $1;
+    INFO("Found interface '$1'")
+  }
+  my $iface = $map->{current_interface};
+  
+  if ($line =~ /inet addr:(\d+\.\d+\.\d+\.\d+)/) {
+    INFO("Found IP address '$1'");
+    $map->{$iface} = $1;
+    $map->{$1} = $iface;
+    $gmap->{ip}{$1} = $server unless substr($1, 0, 4) eq '127.';
+  }
+}
+
+sub _parse_proc_names {
+  my ($line, $server, $map, $gmap) = @_;
+  
+  if ($line =~ m{^/service/(.+?): up .pid (\d+)}) {
+    $map->{$2} = $1;
+    $map->{$1} = $2;
+    INFO("Found service '$1' with pid '$2'");
+  }
+}
+
+sub _parse_netstat {
+  my ($line, $server, $map, $gmap) = @_;
+  
+  # Active Internet connections (servers and established)
+  return if $line =~ /^Active Internet connections/;
+  
+  # Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name   
+  return if $line =~ /Proto\s+Recv-Q\s+Send-Q/;
+  
+  # Active UNIX domain sockets (servers and established)
+  return if $line =~ /^Active UNIX domain sockets/;
+
+  # Proto RefCnt Flags       Type       State         I-Node PID/Program name    Path
+  return if $line =~ /^Proto RefCnt Flags/;
+
+  
+  # tcp        0      0 0.0.0.0:25              0.0.0.0:*               LISTEN      344/tcpserver       
+  if ($line =~ m{^tcp\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+).+(LISTEN)\s+(\d+)/(.+)}) {
+    my $data = { proto => 'tcp', addr => $1, port => $2, state => $3, pid => $4, short_name => $5 };
+    my $open_sock = $map->{open_sock} ||= [];
+    push @$open_sock, $data;
+    INFO("Found open socket '$1:$2/tcp' with pid '$3' at $server");
+  }
+  # tcp        0      0 0.0.0.0:2222            0.0.0.0:*               LISTEN      -                   
+  elsif ($line =~ m{^tcp\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+).+(LISTEN)\s+-}) {
+    my $data = { proto => 'tcp', addr => $1, port => $2, state => $3 };
+    my $open_sock = $map->{open_sock} ||= [];
+    push @$open_sock, $data;
+    INFO("Found open socket '$1:$2/tcp' without pid at $server");
+  }
+  # tcp        0      0 213.13.146.24:5222      85.240.82.208:1048      ESTABLISHED31858/beam.smp
+  elsif ($line =~ m{^(\S+)\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+)\s+(\d+\.\d+\.\d+\.\d+):(\d+)\s+(ESTABLISHED)\s*(\d+)/(.+)}) {
+    my $data = { proto => $1, l_addr => $2, l_port => $3, r_addr => $4, r_port => $5, state => $6, pid => $7, short_name => $8 };
+    my $conns = $map->{conns} ||= [];
+    push @$conns, $data;
+    INFO("Found connection '$2:$3/$1' - '$4:$5/$1' with pid '$6' at $server");
+  }
+  # tcp        0      0 10.135.33.30:50605      10.135.33.14:3306       ESTABLISHED-
+  elsif ($line =~ m{^(\S+)\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+)\s+(\d+\.\d+\.\d+\.\d+):(\d+)\s+(ESTABLISHED)\s*-}) {
+    my $data = { proto => $1, l_addr => $2, l_port => $3, r_addr => $4, r_port => $5, state => $6 };
+    my $conns = $map->{conns} ||= [];
+    push @$conns, $data;
+    INFO("Found connection '$2:$3/$1' - '$4:$5/$1' with at $server");
+  }
+  # udp        0      0 0.0.0.0:32768           0.0.0.0:*                          3430/rpc.statd       
+  elsif ($line =~ m{^udp\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+).+(\d+)/(.+)}) {
+    my $data = { proto => 'udp', addr => $1, port => $2, pid => $3, short_name => $4, state => 'LISTEN' };
+    my $open_sock = $map->{open_sock} ||= [];
+    push @$open_sock, $data;
+    INFO("Found open socket '$1:$2/udp' with pid '$3' at $server");
+  }
+  # udp        0      0 0.0.0.0:32768           0.0.0.0:*                          -
+  elsif ($line =~ m{^udp\s+\d+\s+\d+\s+(\d+\.\d+\.\d+\.\d+):(\d+).+-}) {
+    my $data = { proto => 'udp', addr => $1, port => $2, state => 'LISTEN' };
+    my $open_sock = $map->{open_sock} ||= [];
+    push @$open_sock, $data;
+    INFO("Found open socket '$1:$2/udp' at $server");
+  }
+  elsif ($line =~ /^tcp6\s/) {
+    return;
+  }
+  elsif ($line =~ /^unix\s/) {
+    return;
+  }
+  elsif ($line =~ /\s+FIN_WAIT1\s+-/) {
+    return;
+  }
+  elsif ($line =~ /\s+(?:FIN_WAIT1|TIME_WAIT|LAST_ACK|SYN_SENT|CLOSING|CLOSE_WAIT)/) {
+    return;
+  }
+  else {
+    WARN('Unparsed netstat line: ', $line);
+  }
+}
+
+###################################
+# Iterate over a file descriptor, l
+
+sub foreach_line {
+  my ($cb) = @_;
+  
+  my %context;
+  
+  # open(my $fh, '<', $file) || croak('Could not open file: $file');
+
+  while (my $line = <>) {
+    chomp($line);
+#    eval { $cb->($line, \%context) };
+    $cb->($line, \%context);
+    if ($@) {
+      print STDERR "ERROR: $@";
+      return undef;
+    }
+  }
+  
+  return \%context;
+}
+
+sub walk {
+  my ($root, $action, @rest) = @_;
+  
+  $action->($root, @rest);
+
+  return if !ref($root);
+  if (UNIVERSAL::isa($root => 'ARRAY')) {
+    my $i = 0;
+    walk($_, $action, @rest, $i++) for @$root;
+  }
+  elsif (UNIVERSAL::isa($root => 'HASH')) {
+    walk($root->{$_}, $action, @rest, $_) for keys %$root;    
+  }
+}
