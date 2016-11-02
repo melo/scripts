@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Markdown preview of stdin
+
+file=/tmp/markdown_preview.$$.html
+
+Markdown.pl $1 | x-html-use-my-css > $file
+open $file
+( sleep 5 && rm -f $file ) &
