@@ -1,0 +1,28 @@
+#!/usr/bin/env perl
+#
+#
+
+use strict;
+use warnings;
+use Path::Class 'dir';
+
+my ($base) = @ARGV;
+die "Usage: x-links-to-relative <basedir>\n" unless $base && -d $base;
+
+chdir($base) || die "FATAL: could not chdir to '$base' - $!\n";
+
+# Path::Class::Dir
+$base = dir($base);
+
+$base->recurse(callback => sub {
+  my ($o) = @_;
+  my $f = $o->stringify;
+  return unless -l $f;
+
+  my $dst = dir(readlink($f));
+  my $bn  = $dst->basename;
+
+  print "O: $o   D: $dst   N: $bn\n";
+  unlink($f);
+  symlink($bn, $f);
+});
