@@ -1,0 +1,44 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use AnyEvent;
+use AnyEvent::HTTP;
+use Time::HiRes qw( gettimeofday tv_interval );
+
+$AnyEvent::HTTP::MAX_PERSISTENT_PER_HOST = 10; # default 2
+$AnyEvent::HTTP::MAX_PER_HOST            = 10; # default 10
+
+my $done = AnyEvent->condvar;
+
+my ($db, $end, $docs_per) = @ARGV;
+unless ($end) {
+  print STDERR "Usage: couchdb-bench DATABASE COUNT\n";
+  exit(1);
+}
+$docs_per ||= 1;
+
+my $doc = '{ "me": 1 }';
+my @docs;
+my $counter = $docs_per;
+push @docs, $doc  while $counter--;
+$doc = join(',', @docs);
+
+
+my $last;
+for (my $n = 1; $n <= $end; $n++) {
+  my $t = $n;
+  http_request 'POST', "http://127.0.0.1:5984/$db/_bulk_docs", body => qq{{ "docs": [$doc] }}, sub {
+     $done->send if $t == $end;
+     $last = $_[0];
+  };
+}
+
+
+my $t0 = [gettimeofday];
+$done->recv;
+my $elapsed = tv_interval ( $t0 );
+
+my $total = $end * $docs_per;
+print "\n\ntotal $total, elapsed $elapsed, rate ", $total/$elapsed, "\n";
+print "Sample output:\n$last\n\n";
