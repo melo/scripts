@@ -1,0 +1,18 @@
+#!/bin/sh
+
+workdir="$HOME/.redis-server"
+if [ ! -d "$workdir" ] ; then
+  mkdir -p "$workdir"
+fi
+
+config=
+if [ -e "$workdir/redis.conf" ] ; then
+  config="$workdir/redis.conf"
+fi
+
+server=${1:-redis-server}
+shift
+
+echo Starting... $server $config "$@"
+cd "$workdir" && exec $server $config "$@" > /dev/null &
+
