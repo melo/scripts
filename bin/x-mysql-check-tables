@@ -13,6 +13,7 @@ my $user;
 my $pwd = $ENV{MYSQL_PASSWORD};
 my $askpass;
 my $count;
+my $skip_empty;
 
 my $ok = GetOptions(
   "host=s", \$host,
@@ -20,6 +21,7 @@ my $ok = GetOptions(
   "password=s", \$pwd,
   "askpass", \$askpass,
   "count", \$count,
+  "skip-empty", \$skip_empty,
 );
 
 usage() if !$ok;
@@ -34,6 +36,8 @@ $pwd = prompt_noecho("Enter password:") if $askpass;
 
 my $dbh = DBI->connect($dsn, $user, $pwd) ||
   die $DBI::errstr;
+
+$count = 1 if $skip_empty;
 
 if ($db) { check_tables($dbh, $db) }
 else     { list_dbs($dbh)          }
@@ -73,8 +77,10 @@ sub check_table {
   ($rows) = $dbh->selectrow_array(qq{ SELECT COUNT(*) FROM $table })
     if $count;
 
+  return if $skip_empty && $rows == 0;
+
   if (@$result == 1 && is_ok($result->[0])) {
-    print "  $table".(defined $rows? "($rows)" : '').": is OK\n";
+    print "  $table".(defined $rows? "( $rows )" : '').": is OK\n";
     return;
   }
   
