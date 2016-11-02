@@ -1,0 +1,17 @@
+#!/bin/sh
+
+ffmpeg=/Users/melo/Applications/Air\ Video\ Server.app/Contents/Resources/ffmpeg
+
+"$ffmpeg" -i $1 -f mpegts -acodec libmp3lame -ar 48000 -ab 64k -s 320x240 -vcodec libx264 -b 800k -flags +loop -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -subq 5 -trellis 1 -refs 1 -coder 0 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -bt 200k -maxrate 800k -bufsize 800k -rc_eq 'blurCplx^(1-qComp)' -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -level 30 -aspect 320:240 -g 30 -async 2 $2
+
+#  /Users/melo/Applications/Air\ Video\ Server.app/Contents/Resources/ffmpeg \
+#      -threads 4 -flags2 +fast -flags +loop -g 30 -keyint_min 1 \
+#      -bf 0 -b_strategy 0 -flags2 -wpred-dct8x8 -cmp +chroma \
+#      -deblockalpha 0 -deblockbeta 0 -refs 1 -coder 0 -me_range 16 \
+#      -subq 5 -partitions +parti4x4+parti8x8+partp8x8 -trellis 0 \
+#      -sc_threshold 40 -i_qfactor 0.71 -qcomp 0.6 -map 0.0:0.0 \
+#      -map 0.1:0.1 -ss 0.0 -vf "crop=624:352:0:0, scale=568:320, pad=576:320" \
+#      -aspect 624:352 -y -async 1 -crf 29 -qmin 29 \
+#      -r 23.976 -f mpegts -i $1 $2
+#  
+# /Users/melo/Applications/Air Video Server.app/Contents/Resources/ffmpeg --conversion-id 564e52b0-3850-4682-9f84-4d5ef5af806c --port-number 46631 -threads 4 -flags2 +fast -flags +loop -g 30 -keyint_min 1 -bf 0 -b_strategy 0 -flags2 -wpred-dct8x8 -cmp +chroma -deblockalpha 0 -deblockbeta 0 -refs 1 -coder 0 -me_range 16 -subq 5 -partitions +parti4x4+parti8x8+partp8x8 -trellis 0 -sc_threshold 40 -i_qfactor 0.71 -qcomp 0.6 -map 0.0:0.0 -map 0.1:0.1 -ss 0.0 -i /Volumes/Spare/Video/covert_affairs-2x08.avi -vf crop=624:352:0:0, scale=568:320, pad=576:320 -aspect 624:352 -y -async 1 -f h264 -vcodec libx264 -crf 29 -qmin 29 -r 23.976 /Volumes/Spare/Video/57ff9352-445e-413e-8ea5-77cb5658f995.h264 -f adts -ar 48000 -f wav -ac 2 -
