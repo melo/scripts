@@ -1,0 +1,6 @@
+#!/usr/bin/perl
+
+use strict;
+
+exec("rsync -a $ENV{HOME}/.ssh/*.pem $ENV{HOME}/.ssh/*.pub $ENV{HOME}/.ssh/config q:.ssh/") if $0 eq 'qs' or $ARGV[0] eq 'sync' or $ARGV[0] eq 's';
+exec('ssh', 'q', @ARGV);
