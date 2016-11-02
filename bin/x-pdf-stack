@@ -1,0 +1,18 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use PDF::API2;
+
+my $destination = shift @ARGV;
+usage("Requires a destination file name") unless $destination;
+usage("Requires at least two PDF files") if @ARGV < 2;
+
+my $top = PDF::API2->open(shift @ARGV);
+my $page = $top->openpage(1);
+while (@ARGV) {
+  my $next = PDF::API2->open(shift @ARGV);
+  $top->importpage($next, 1, $page);
+}
+$top->saveas($destination);
+$top->end;
