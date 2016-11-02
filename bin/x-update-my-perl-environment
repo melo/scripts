@@ -9,7 +9,7 @@ cd $workdir
 
 which minicpan > /dev/null
 if [ $? == 1 ] ; then
-  cpanm -n CPAN::Mini
+  cpant -n CPAN::Mini
 fi
 minicpan
 
@@ -18,13 +18,13 @@ cd bootstrap || exit
 
 which dzil > /dev/null
 if [ $? == 1 ] ; then
-  cpanm -n Dist::Zilla
+  cpant -n Dist::Zilla
 fi
 
-dzil authordeps | cpanm -n
-dzil run cpanm --installdeps -n .
-moose-outdated | cpanm -n
-dzil run cpanm --installdeps -n .
+dzil authordeps | cpant -n
+dzil run cpant --installdeps -n .
+moose-outdated | cpant -n
+dzil run cpant --installdeps -n .
 
-cpan-outdated | cpanm -n
-moose-outdated | cpanm -n
+cpan-outdated | cpant -n
+moose-outdated | cpant -n
