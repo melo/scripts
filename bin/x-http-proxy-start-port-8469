@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec tinyproxy -d -c "$HOME/.scripts.d/etc/tinyproxy.conf"
