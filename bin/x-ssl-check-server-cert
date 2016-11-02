@@ -1,0 +1,6 @@
+#!/bin/sh
+
+openssl s_client -connect "$1" < /dev/null 2> /dev/null                               | \
+    perl -ne 'print if /^-----BEGIN CERTIFICATE-----/../^-----END CERTIFICATE-----/'  | \
+    openssl x509 -text
+
