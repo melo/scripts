@@ -1,0 +1,44 @@
+#!/usr/bin/env perl
+
+=pod
+
+ZeroMQ subscribers, accepts topic name to subscribe as parameter.
+
+=cut
+
+use strict;
+use warnings;
+
+use ZeroMQ qw/:all/;
+
+my ($addr, $topic_filter) = @ARGV;
+usage() unless $addr;
+
+my $ctx = ZeroMQ::Context->new();
+
+my $sock = $ctx->socket(ZMQ_SUB);
+$sock->setsockopt(ZMQ_SUBSCRIBE, $topic_filter || '');
+$sock->connect($addr);
+
+while (1) {
+  my $topic = $sock->recv;
+  my $msg   = $sock->recv;
+  print $topic->data, ': ', $msg->data, "\n";
+}
+
+
+sub usage {
+  print STDOUT <<EOU;
+Usage: x-zeromq-pubsub-subscriber <addr> [<topic_filter>]
+
+  Connect a ZeroMQ SUB socket to addr, and listens for published
+  messages.
+
+  Assumes two-part messages, first is topic, second is data.
+
+  You can use topic_filter as a prefix filter on topics.
+
+EOU
+
+ exit(1);
+}

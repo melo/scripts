@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+#
+# Start a PUBSUB ZeroMQ forwarder device: allow publishers and
+# subscribers to connect/disconnect from the topology at will
+#
+# x-zeromq-pubsub-forwarder SUB-endpoint PUB-endpoint
+#
+# Make all your publishers use SUB-endpoint and all your subscribers use
+# PUB-endpoint, both using connect().
+#
+# Pedro Melo <melo@simplicidade.org>, 2012
+# License: Artistic V2
+#
+
+use strict;
+use warnings;
+
+use ZeroMQ qw/:all/;
+use ZeroMQ::Raw qw/zmq_device/;
+
+my ($sub_addr, $pub_addr) = @ARGV;
+usage() unless $sub_addr && $pub_addr;
+
+my $context = ZeroMQ::Context->new();
+
+# Socket facing message sources
+my $frontend = $context->socket(ZMQ_SUB);
+$frontend->setsockopt(ZMQ_SUBSCRIBE, '');
+$frontend->bind($sub_addr);
+
+# Socket facing message sinks
+my $backend = $context->socket(ZMQ_PUB);
+$backend->bind($pub_addr);
+
+# Start forwarder device
+zmq_device(ZMQ_FORWARDER, $frontend->socket, $backend->socket);
+
+sub usage {
+  print <<EOU;
+Usage: x-zeromq-pubsub-forwarder <sub_enpoint> <pub_endpoint>
+
+  Start a PUBSUB ZeroMQ forwarder device: allow publishers and
+  subscribers to connect/disconnect from the topology at will
+ 
+  Make all your publishers use sub_endpoint and all your subscribers use
+  pub_endpoint, both using connect().
+EOU
+
+  exit(1);
+}
