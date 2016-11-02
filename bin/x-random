@@ -1,0 +1,12 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my ($n, $c) = @ARGV;
+$n = 1 unless $n;
+$c = 1 unless $c;
+
+while ($c--) {
+  print rand($n),"\n";
+}
