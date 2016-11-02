@@ -1,0 +1,27 @@
+#!/usr/bin/env perl
+#
+# Generated an encrypted password using Crypt::PBKDF2
+#
+
+use strict;
+use warnings;
+use Crypt::PBKDF2;
+
+my ($password) = @ARGV;
+if (!$password) {
+  my $is_tty = -t \*STDIN;
+
+  print "Type your password:\n" if $is_tty;
+  $password = <>;
+  chomp($password);
+  
+  if ($is_tty) {
+    print "Type it again:\n";
+    my $check = <>;
+    chomp($check);
+    
+    die "Password mismatch\n" if $password ne $check;
+  }
+}
+
+print Crypt::PBKDF2->new->generate($password), "\n";
