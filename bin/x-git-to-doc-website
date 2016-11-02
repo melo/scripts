@@ -1,0 +1,74 @@
+#!/usr/bin/env perl
+#
+# Converts github-style perl project to a documentation website
+#
+# Index page is taken from the README.md page.
+#
+# All .pm files are searched for POD and converted to HTML.
+# Everything is dumped to the required output directory parameter.
+#
+
+package Project::Converter::Perl;
+
+use Moo;
+use Path::Tiny;
+use Getopt::Long;
+use Text::Markdown 'markdown';
+
+has 'source' => (is => 'ro', required => 1);
+has 'output' => (is => 'ro', required => 1);
+
+sub run {
+  my ($self) = @_;
+  
+  my @pod_files = $self->collect_perl_files_with_pod;
+  $self->convert_file_with_pod($_) for @pod_files;
+  
+  $self->convert_readme(\@pod_files);
+}
+
+sub collect_perl_files_with_pod {
+  return ();
+}
+
+sub convert_file_with_pod {
+  ...;
+}
+
+sub convert_readme {
+  my ($self, $pod_files) = @_;
+
+  my $readme = $self->source->child('README.md');
+  return unless $readme->is_file;
+  
+  my $html = markdown($readme->slurp);
+  $self->output->child('index.html')->spew($html);
+}
+
+sub new_from_options {
+  my ($class) = @_;
+  
+  my %opts;
+  GetOptions(\%opts, 'output=s', 'help|?') or usage();
+  usage() if exists $opts{help} and $opts{help};
+  usage('more than one source directory given') if @ARGV > 1;
+  usage('output parameter is required') unless $opts{output};
+  
+  $opts{source} = @ARGV? $ARGV[0] : '.';
+  
+  $opts{$_} = path($opts{$_}) for qw( source output );
+  return $class->new(%opts);
+}
+
+sub usage {
+  print STDERR "FATAL: @_\n" if @_;
+  
+  print STDERR "Usage: x-git-to-doc-website --output=<dir> [<source>]\n";
+  exit(1);
+}
+
+
+
+package main;
+
+Project::Converter::Perl->new_from_options->run;
