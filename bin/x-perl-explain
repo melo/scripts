@@ -1,0 +1,29 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my $input = do { local $/; <> };
+
+show_cant_locate($1) if $input =~ /(Can't locate .+? in \@INC.+)/;
+
+
+sub show_cant_locate {
+  my ($m) = @_;
+  my ($pack, $inc, $st) = $m =~ m/Can't locate (.+?) in \@INC \(\@INC contains: (.+?)\) (.+)/gsm;
+
+  $pack =~ s/[.]pm$//;
+  $pack =~ s{/}{::}g;
+  
+  $st =~ s/\\n/\n\t/g;
+  
+  $inc = [split(/\s+/, $inc)];
+  
+  print "Missing package: $pack\n";
+  print "Stack Trace: $st\n";
+  print "\@INC:\n";
+  print "  $_\n" for @$inc;
+}
+
+__END__
+[Wed Feb 08 22:38:28 2012] [error] Can't locate DBIx/Recordset.pm in @INC (@INC contains: /Users/melo/Documents/work/evolui/e1/elib/percy/lib /Users/melo/Documents/work/evolui/e1/elib/MyTK/lib /Users/melo/Documents/work/evolui/e1/lib /Users/melo/work/evolui/gestao/lib/common /Users/melo/work/evolui/e1/lib /Users/melo/work/evolui/e1/elib/MyTK/lib /Users/melo/work/evolui/e3/lib /Users/melo/work/evolui/e5/lib /Users/melo/work/evolui/e2/lib /usr/local/git/lib/site_perl/5.12.1 /Users/melo/perl5/perlbrew/perls/perl-5.14.1/lib/site_perl/5.14.1/darwin-2level /Users/melo/perl5/perlbrew/perls/perl-5.14.1/lib/site_perl/5.14.1 /Users/melo/perl5/perlbrew/perls/perl-5.14.1/lib/5.14.1/darwin-2level /Users/melo/perl5/perlbrew/perls/perl-5.14.1/lib/5.14.1 . /Users/melo/apps/apache2) at /Users/melo/Documents/work/evolui/e1/lib/Tracking/Redirects.pm line 4.\nBEGIN failed--compilation aborted at /Users/melo/Documents/work/evolui/e1/lib/Tracking/Redirects.pm line 4.\nCompilation failed in require at /Users/melo/Documents/work/evolui/e1/lib/Evolui/BackOffice.pm line 6.\nBEGIN failed--compilation aborted at /Users/melo/Documents/work/evolui/e1/lib/Evolui/BackOffice.pm line 6.\nCompilation failed in require at /Users/melo/Documents/work/evolui/e1/lib/Evolui/BO/Campanha.pm line 5.\nBEGIN failed--compilation aborted at /Users/melo/Documents/work/evolui/e1/lib/Evolui/BO/Campanha.pm line 5.\nCompilation failed in require at /Users/melo/work/evolui/gestao/etc/apache/gestao/startup.pl line 86.\nBEGIN failed--compilation aborted at /Users/melo/work/evolui/gestao/etc/apache/gestao/startup.pl line 86.\nCompilation failed in require at (eval 2) line 1.\n
