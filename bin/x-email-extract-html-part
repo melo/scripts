@@ -1,0 +1,16 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Courriel;
+
+binmode(\*STDOUT, 'encoding(UTF-8)');
+
+my $raw_email = do {
+  local $/;
+  <>;
+};
+
+my $m = Courriel->parse(text => $raw_email);
+my $html = $m->html_body_part;
+print $html->content;
