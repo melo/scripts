@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Starts a local nginx server using the configuration found at ~/.nginx/nginx.conf
+#
+
+NGINX=/Users/melo/apps/nginx/sbin/nginx
+if [ ! -e "$NGINX" ] ; then
+  NGINX=/Users/melo/.homebrew/sbin/nginx
+fi
+CFG_DIR="$HOME/.nginx.d"
+CFG_CONF="$CFG_DIR/conf"
+CFG_TMPL="$CFG_CONF/nginx.conf"
+CFG_VHOSTS="$CFG_DIR/vhosts.d"
+CFG_OVERRIDE="$CFG_DIR/env.sh"
+
+RUN_DIR="$TMPDIR/nginx"
+RUN_DIR_LOGS="$RUN_DIR/logs"
+RUN_DIR_CONF="$RUN_DIR/conf"
+RUN_DIR_VHOSTS="$RUN_DIR/vhosts.d"
+RUN_CONFIG="$RUN_DIR/conf/nginx.conf"
+
+# ### Mac OS X friendly
+# app_support="$HOME/Library/Application Support"
+# if [ -d "$app_support" ] ; then
+#   RUN_DIR="$app_support/nginx"
+# fi
+
+OPT_TAIL=
+if [ "$1" == "--tail" ] ; then
+  OPT_TAIL=1
+fi
+
+### Sanitize cfg environment
+if [ ! -d "$CFG_DIR" ] ; then
+  echo "FATAL: make sure your config dir ($CFG_DIR) exists."
+  exit 1
+fi
+
+
+### Load user configuration overrides
+if [ -e "$CFG_OVERRIDE" ] ; then
+  . "$CFG_OVERRIDE"
+fi
+
+
+### Setup environment
+export NGINX OPT_TAIL
+export CFG_DIR CFG_CONF CFG_TMPL CFG_VHOSTS CFG_OVERRIDE
+export RUN_DIR RUN_DIR_LOGS RUN_DIR_CONF RUN_DIR_VHOSTS RUN_CONFIG
+
+
+### Check other required files
+if [ ! -f "$CFG_TMPL" ] ; then
+  echo "FATAL: make sure your config file template ($CFG_TMPL) exists."
+  exit 1
+fi
+
+
+### Sanitize run environment
+rm -rf "$RUN_DIR"
+for d in "$RUN_DIR" "$RUN_DIR_LOGS" "$RUN_DIR_CONF" "$RUN_DIR_VHOSTS" "$RUN_DIR/client_body_temp_path" "$RUN_DIR/proxy_temp_path" "$RUN_DIR/fastcgi_temp_path" ; do
+  if [ ! -d "$d" ] ; then
+    mkdir -p "$d"
+  fi
+done
+
+rsync -a "$CFG_CONF/" "$RUN_DIR_CONF"
+
+
+### Generate configuration files
+perl -pe 's/\${(\w+)(:(.+?))?}/$ENV{$1} || $3/ge' < "$CFG_TMPL" > "$RUN_CONFIG"
+
+(
+  cd "$CFG_VHOSTS"
+  for vhost in * ; do
+    if [ -r "$vhost" ] ; then
+      perl -pe 's/\${(\w+)(:(.+?))?}/$ENV{$1} || $3/ge' < "$vhost" > "$RUN_DIR_VHOSTS/$vhost"
+    fi
+  done
+)
+
+
+### Start the server
+echo "Starting server at $RUN_DIR (using $NGINX)"
+$NGINX -v
+if [ "$OPT_TAIL" ] ; then
+  ( sleep 2 ; cd "$RUN_DIR/logs" && bash -c 'exec tail -F *' ) &
+fi
+exec $NGINX -p "$RUN_DIR/" -c "$RUN_CONFIG"
