@@ -1,0 +1,57 @@
+#!/usr/bin/env perl
+#
+# Use UPnP to find out your own IP address if behind a NAT device
+#
+# Pedro Melo <melo@simplicidade.org>
+#
+
+use strict;
+use warnings;
+use Net::UPnP::ControlPoint;
+use Net::UPnP::GW::Gateway;
+
+my $obj = Net::UPnP::ControlPoint->new();
+my @dev_list = $obj->search(st =>'upnp:rootdevice', mx => 3);
+my $devNum= 0;
+
+foreach my $dev (@dev_list) {
+  my $device_type = $dev->getdevicetype();
+  print "  >> device type $device_type\n";
+  next unless $device_type eq 'urn:schemas-upnp-org:device:InternetGatewayDevice:1';
+  
+  my $name = $dev->getfriendlyname() || '<unamed>';
+  print "  >> name $name\n";
+  
+  next unless $dev->getservicebyname('urn:schemas-upnp-org:service:WANIPConnection:1');
+  
+  my $gwdev = Net::UPnP::GW::Gateway->new;
+  $gwdev->setdevice($dev);
+  
+  print "\tExternalIPAddress = " . $gwdev->getexternalipaddress() . "\n";
+
+  print "[$devNum]: $name\n";
+  next unless $dev->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1');
+
+  my $condir_service = $dev->getservicebyname('urn:schemas-upnp-org:service:ContentDirectory:1');
+  next unless defined($condir_service);
+
+  my %action_in_arg = (
+    'ObjectID'       => 0,
+    'BrowseFlag'     => 'BrowseDirectChildren',
+    'Filter'         => '*',
+    'StartingIndex'  => 0,
+    'RequestedCount' => 0,
+    'SortCriteria'   => '',
+  );
+  my $action_res = $condir_service->postcontrol('Browse', \%action_in_arg);
+  next unless $action_res->getstatuscode() == 200;
+
+  my $actrion_out_arg = $action_res->getargumentlist();
+  next unless $actrion_out_arg->{'Result'};
+
+  my $result = $actrion_out_arg->{'Result'};
+  while ($result =~ m/<dc:title>(.*?)<\/dc:title>/sgi) {
+    print "\t$1\n";
+  }
+  $devNum++;
+}
