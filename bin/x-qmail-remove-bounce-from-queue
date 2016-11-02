@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Remove "remote" bounce messages from a qmail queue
+#
+
+queue=$1
+
+if [ -z "$queue" ] ; then
+  echo "Usage: x-qmail-remove-bounce-from-queue QMAIL_QUEUE_DIR"
+  exit 2
+fi
+
+cd $queue
+if [ $? != 0 ] ; then
+  echo "FATAL: could not chdir to '$queue'"
+  exit 1
+fi
+
+for dir in bounce info intd local lock mess pid remote todo ; do
+  if [ ! -d $dir ] ; then
+    echo "FATAL: '$queue' is not a valid qmail queue"
+    exit 1
+  fi
+done
+
+cd info
+if [ $? != 0 ] ; then
+  echo "FATAL: could not chdir to '$queue/info'"
+  exit 1
+fi
+
+for mess in `find . -type f -size 2c` ; do
+  if [ ! -e ../remote/$mess ] ; then
+    continue
+  fi
+
+  echo "Remove remote bounce $mess"
+  rm -f ../{mess,remote,info}/$mess
+done
+
