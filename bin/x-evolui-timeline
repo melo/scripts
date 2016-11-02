@@ -1,0 +1,4 @@
+#!/bin/sh
+#
+
+cd ~/work/evolui && exec x-git-timeline E1=e1 Gestao=gestao E5=e5 Forums=e3 Admin=e2 Misc=false_start -- $@
