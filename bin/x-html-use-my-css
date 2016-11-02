@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+#
+# filter: reads stdin, dumps to stdout.
+# puts std html stuff with my_css around html input
+# usefull with Markdow.pl file | this_script > destination
+#
+
+use strict;
+
+print <<EOF;
+<html>
+<head>
+<link rel="StyleSheet" href="file://$ENV{HOME}/.my_css" type="text/css" media="screen" />
+</head>
+<body>
+EOF
+
+print while(<>);
+
+print <<EOF;
+</body>
+</html>
+EOF
