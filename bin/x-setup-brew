@@ -1,5 +1,8 @@
 #!/bin/sh
 
+## make sure all is up-to-date
+brew upgrade
+
 ## General utils we love
 brew install plenv perl-build nodeenv bash-completion git autojump nmap openssl \
              docker-compose-completion docker-completion docker-compose-completion \
@@ -14,4 +17,3 @@ brew install ag git-extras
 
 ## git compilation requires these
 brew install autoconf
-
