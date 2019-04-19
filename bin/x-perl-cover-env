@@ -14,7 +14,7 @@ fi
 
 # Run rest of command line in a subshell with coverage enabled
 (
-  MYPERL5OPT="-MDevel::Cover"
+  MYPERL5OPT="-MDevel::Cover=+ignore,^local/,+ignore,^t/,+ignore,^xt/,+ignore,bin/prove"
   if [ -z "$PERL5OPT" ] ; then
     PERL5OPT=$MYPERL5OPT
   else
