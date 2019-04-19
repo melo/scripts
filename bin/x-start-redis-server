@@ -1,0 +1,21 @@
+#!/bin/sh
+
+workdir="$HOME/workspace/redis"
+if [ ! -d "$workdir" ] ; then
+  mkdir -p "$workdir"
+fi
+
+config=
+if [ -e "$workdir/redis.conf" ] ; then
+  config="$workdir/redis.conf"
+fi
+
+server=${1:-redis-server}
+shift
+
+LC_COLLATE='pt_PT.UTF-8'
+export LC_COLLATE
+
+echo Starting... $server $config "$@"
+cd "$workdir" && exec $server $config "$@"
+
