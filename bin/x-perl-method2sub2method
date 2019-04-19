@@ -1,0 +1,16 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+while (<>) {
+  if (m/^method\s+(\S+)\s*(\(.+?\))?\s*\{\s*$/) {
+    print "sub $1 { my \$self = shift; my $2 = \@_; #### METHOD MARKER $1 $2\n";
+  }
+  elsif (m/^.+#### METHOD MARKER (\S+) (.+)$/) {
+    print "method $1 $2 {\n";
+  }
+  else {
+    print $_;
+  }
+}
