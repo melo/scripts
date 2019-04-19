@@ -10,4 +10,5 @@ cpanm -n JSON JSON::MaybeXS Cwd File::Spec::Functions Getopt::Long \
          Perl::LanguageServer Path::Tiny Digest::SHA CPAN::Mini \
          LWP::Protocol::https Mozilla::CA HTTP::Tiny \
          App::cpanminus Carton Devel::Cover PPI::HTML \
-         Pod::Text::Color::Delight
+         Pod::Text::Color::Delight \
+         Reply Term::ReadLine 
