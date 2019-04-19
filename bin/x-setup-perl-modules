@@ -9,4 +9,5 @@ cpanm -n JSON JSON::MaybeXS Cwd File::Spec::Functions Getopt::Long \
          Code::TidyAll::Plugin::PerlTidySweet \
          Perl::LanguageServer Path::Tiny Digest::SHA CPAN::Mini \
          LWP::Protocol::https Mozilla::CA HTTP::Tiny \
-         App::cpanminus Carton Devel::Cover PPI::HTML
+         App::cpanminus Carton Devel::Cover PPI::HTML \
+         Pod::Text::Color::Delight
