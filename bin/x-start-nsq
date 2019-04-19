@@ -1,0 +1,10 @@
+#!/bin/sh
+
+mkdir -p ~/workspace/nsq
+(
+  echo nsqlookupd
+  echo nsqd --data-path ~/workspace/nsq/1 --lookupd-tcp-address '127.0.0.1:4160'
+  echo nsqd --tcp-address='0.0.0.0:4152' --http-address='0.0.0.0:4153' --data-path ~/workspace/nsq/2 --lookupd-tcp-address '127.0.0.1:4160'
+  echo nsqadmin --lookupd-http-address '127.0.0.1:4161' --notification-http-endpoint 'http://127.0.0.1:4151/pub?topic=nsqadmin.actions'
+  echo nsq_tail --lookupd-http-address '127.0.0.1:4161' --topic 'nsqadmin.actions'
+) | supervise-me
