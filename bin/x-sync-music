@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# Sync iTunes Music to Pen Drive
+#
+
+if [ ! -d /Volumes/MUSIC ] ; then
+  echo "FATAL: mount pen drive labeled MUSIC to proceed"
+  exit 1
+fi
+
+rsync -avm '/Users/melo/Music/iTunes/iTunes Music/' /Volumes/MUSIC/iTunes "$@" \
+  --delete            \
+  --delete-excluded   \
+  --exclude="Movies"  \
+  --exclude="Your Mac Life" \
+  --exclude="WireTap Pro" \
+  --exclude="WebTalk Radio*" \
+  --exclude="Voice Memos" \
+  --exclude="O'Reilly *" \
+  --exclude="FLOSS*" \
+  --exclude="OSCON*" \
+  --exclude="Nuno Nunes*" \
+  --exclude="*Jon Udell*" \
+  --exclude="Boyd Timothy" \
+  --exclude="Open Source *" \
+  --exclude="slicehost *" \
+  --exclude="Griffin Tech*" \
+  --exclude="Dr. Moira Gunn*" \
+  --exclude="Perlcast*" \
+  --exclude="Podcasts" \
+  --exclude="Carson *" \
+  --exclude="Books" \
+  --exclude="*SD Forum*" \
+  --exclude="SXSW*" \
+  --exclude="*MySQL*" \
+  --exclude="IT Conversation*" \
+  --exclude="Mac OS X Conference*" \
+  --exclude="*ITC*" \
+  --exclude="MacNotables" \
+  --exclude="*CTO Connection*" \
+  --exclude="Core Intuition" \
+  --exclude="Douglas Adams" \
+  --include="*.mp3" \
+  --include="*.m4a" \
+  --include="*.m4p" \
+  --include="*/" \
+  --exclude="*"
