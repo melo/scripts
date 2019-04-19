@@ -1,0 +1,9 @@
+#!/usr/bin/env perl
+
+use v5.10;
+use warnings;
+use PHP::Serialization ();
+use JSON::XS ();
+
+my $in = do { local $/; <> };
+say JSON::XS->new->utf8->pretty->encode(PHP::Serialization::unserialize($in));
