@@ -1,0 +1,27 @@
+#!/usr/bin/env perl
+# 
+
+
+use strict;
+use warnings;
+
+while (my $line = <>) {
+  if ($line !~ m{<key>Location</key><string>file://localhost(.+?.m4p)</string>}) {
+    print $line;
+    next;
+  }
+  
+  my $file = $1;
+  $file =~ s{%(..)}{chr(hex($1))}ge;
+  
+  my $dest = $file;
+  $dest =~ s/[.]m4p$/.m4a/;
+  
+  if (-e $file && -e $dest) {
+    print STDERR "Unlink $file\n";
+    unlink($file);
+  }
+
+  $line =~ s{[.]m4p</string>}{.m4a</string>} if -e $dest;
+  print $line;
+}
