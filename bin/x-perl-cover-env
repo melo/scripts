@@ -34,6 +34,6 @@ if [ "$RECALC_COVERAGE" = '1' ] ; then
   # if [ $? = 255 ] ; then
   #   covered runs
   # fi
-  cover -select_re ^lib/ -report Html_basic
+  cover -select_re ^lib/ -report Html_basic -annotation git
   open cover_db/coverage.html
 fi
