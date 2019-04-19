@@ -6,9 +6,11 @@ brew upgrade
 ## General utils we love
 brew install plenv perl-build nodeenv bash-completion git autojump nmap openssl \
              docker-compose-completion docker-completion docker-compose-completion \
-             go hugo lego gnupg pinentry
+             go hugo lego gnupg pinentry direnv
 
 brew install diff-so-fancy   ## our git config uses this
+
+brew cask install aws-vault
 
 
 # others
