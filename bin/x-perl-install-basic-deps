@@ -1,10 +1,12 @@
 #!/bin/sh
 
 cpanm -n JSON JSON::MaybeXS Cwd File::Spec::Functions Getopt::Long \
-         Data::Dump Time::Moment Text::Autoformat \
+         Data::Dump Data::Printer Time::Moment Text::Autoformat \
          Pod::Cpandoc Code::TidyAll Perl::Tidy Pod::Tidy Mason::Tidy \
+         Code::TidyAll::Plugin::MasonTidy Code::TidyAll::Plugin::PodTidy \
          Code::TidyAll::Plugin::Perl::IgnoreMethodSignaturesSimple \
          Code::TidyAll::Plugin::Perl::AlignMooseAttributes \
+         Code::TidyAll::Plugin::PerlTidySweet \
          Perl::LanguageServer Path::Tiny Digest::SHA CPAN::Mini \
          LWP::Protocol::https Mozilla::CA HTTP::Tiny \
-         App::cpanminus
+         App::cpanminus Carton Devel::Cover PPI::HTML
