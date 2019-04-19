@@ -6,13 +6,13 @@
 
 # Set this to the place where git.git clone is at
 # in you local filesystem
-GIT_CLONE_DIR=$HOME/Documents/work/track/git
+GIT_CLONE_DIR=$HOME/projects/essentials/git
 
 # Where all the git versions will be placed
 # Each version will be inside a directory, like git-v1.5.6.1-204-g6991357
 # Current active version will be a symblink 'git'
 # so you can add $BASE/git/bin to your PATH
-BASE=/usr/local
+BASE=$HOME/.apps/git-versions
 
 ### Nothing more to tweak ###
 
@@ -100,7 +100,7 @@ echo
 echo "******* Installing git and documentation"
 echo
 
-sudo make install install-doc install-man install-html
+make install install-doc install-man install-html
 
 
 echo
@@ -138,11 +138,9 @@ echo Current git version: `readlink $BASE/git`
 echo Switching to version: git-$version
 echo
 
-sudo sh -c "
   cd $BASE;
   rm -f git;
   ln -s git-$version git;
-"
 
 echo
 echo "You are running verion (running git -v now):"
