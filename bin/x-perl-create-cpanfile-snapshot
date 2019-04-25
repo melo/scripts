@@ -1,0 +1,17 @@
+#!/bin/sh
+
+deps="$*"
+
+exec docker run -it --rm -v `pwd`:/src melopt/alpine-perl-devel /bin/sh -c "
+  set -xe
+  mkdir /app
+  cd /app
+  if [ -n '$deps' ] ; then
+    apk --no-cache add $deps
+  fi
+  cp /src/cpanfile .
+  mkdir -p /src/.docker-perl-local
+  ln -s /src/.docker-perl-local local
+  build-perl-deps
+  cp cpanfile.snapshot /src
+"
