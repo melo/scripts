@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Runs the current folder inside a docker container
+#
+# We use a special image that keeps the local/ folder under .docker-perl-
+# local/, and the proper ENV to find it.
+#
+
+docker run -it --rm -v `pwd`:/app melopt/alpine-perl-interactive "$@"
