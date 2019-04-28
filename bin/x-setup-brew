@@ -13,6 +13,11 @@ brew install diff-so-fancy   ## our git config uses this
 brew cask install aws-vault
 
 
+## DuckDNS client
+brew tap jzelinskie/duckdns
+brew install duckdns
+
+
 # others
 brew install ag git-extras
 
