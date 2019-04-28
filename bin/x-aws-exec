@@ -1,32 +1,28 @@
-#!/usr/bin/perl
+#!/bin/sh
 
-use strict;
-use warnings;
+profile="$1"
+shift
 
-setup_config("$ENV{HOME}/.aws/config");
-exec(@ARGV);
+if [ -z "$profile" ] ; then
+  cat <<EOU
+Usage: x-aws-exec <profile> [<cmd>] 
 
-sub setup_config {
-  open(my $fh, '<', $_[0]) or return;
+Executes <cmd> under AWS credentials for <profile>, using aws-vault
 
-  ## Find the profile you want
-  while (<$fh>) { last if m/^\s*\[default\]/ }
+The <cmd> defaults to $SHELL --login
 
-  ## read all the vars
-  my %vars;
-  while (<$fh>) {
-    next if m/^\s*#/;
-    last if m/^\s*\[/;
+Equivalent to:
 
-    chomp;
-    $vars{$1} = $2 if m{^\s*(\S+)\s*=\s*(.*?)\s*$};
-  }
+  aws-vault exec <profile> -- <cmd>
 
-  return unless $vars{aws_access_key_id} and $vars{aws_secret_access_key};
+EOU
+  exit 2
+fi
 
-  $ENV{AWS_ACCESS_KEY_ID}     = $vars{aws_access_key_id};
-  $ENV{AWS_SECRET_ACCESS_KEY} = $vars{aws_secret_access_key};
-  $ENV{AWS_DEFAULT_REGION}    = $vars{region} if $vars{region};
+cmd="aws-vault exec --assume-role-ttl=1h --session-ttl=1h $profile -- "
 
-  return;
-}
+if [ -z "$*" ] ; then
+  exec $cmd $SHELL --login
+else
+  exec $cmd "$@"
+fi
