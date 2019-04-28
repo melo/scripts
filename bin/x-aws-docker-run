@@ -1,0 +1,18 @@
+#!/bin/sh
+
+if [ -z "$*" ] ; then
+  cat <<EOU
+Usage: x-aws-docker-run [<docker-run-options>] <image> [<cmd>] 
+
+Executes a docker run passing along all "AWS_*" environment variables for a
+particular profile, using aws-vault for the credential handling.
+
+Equivalent to:
+
+  exec docker run -it --rm -e AWS* <docker-run-options> <image> <cmd>
+
+EOU
+  exit 2
+fi
+
+exec docker run -it --rm $( set | grep AWS_  | cut -f1 -d= | xargs -n1 echo '-e' ) "$@"
