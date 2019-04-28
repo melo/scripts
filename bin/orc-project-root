@@ -1,0 +1,39 @@
+#!/usr/bin/env perl
+#
+
+use strict;
+use Getopt::Long;
+use Path::Tiny;
+
+sub usage {
+  print STDERR <<EOU;
+Usage: orc-project-root
+
+  Prints to STDOUT the project root directory. It will die if no directory is found.
+  
+  It will scan upwards from cwd(), using real path's.
+  
+  If STDOUT is not a terminal it will skip the trailing newline.
+
+EOU
+
+  exit(1);
+}
+
+my $help_opt;
+GetOptions('help|?' => \$help_opt) or usage();
+usage() if $help_opt;
+
+my $p = path('.')->realpath;
+my $s = $ENV{HOME} ? path($ENV{HOME})->realpath : Path::Tiny->rootdir;
+while (!$p->is_rootdir and "$p" ne "$s") {
+  if ($p->child('.pbs_project')->exists) {
+    print $p->stringify;
+    print "\n" if -t \*STDOUT;
+    exit(0);
+  }
+
+  $p = $p->parent;
+}
+
+die "could not determine project root\n";

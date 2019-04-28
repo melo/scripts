@@ -1,0 +1,119 @@
+#!/usr/bin/env perl
+
+use strict;
+use FindBin;
+use Path::Tiny;
+use Getopt::Long;
+use Module::CPANfile;
+use CPAN::Meta::Prereqs;
+
+### What does this thing do??
+
+sub usage {
+  print STDERR "ERROR: @_\n" if @_;
+
+  print STDERR <<EOU;
+Usage: orc-cpanfile <cmd> [options]
+
+  Tools to manipulate project CPANfiles
+
+  For now three <cmd>'s are available:
+
+   * list: lists all cpanfile's, recursively
+   * merge: generates to stdout a single cpanfile - very primitive algorithm for now
+   * install: install all deps, in a local directory (defaults to ./local)
+
+EOU
+
+  exit(1);
+}
+
+
+### Command line parsing
+
+my ($root_opt, $help_opt);
+
+GetOptions('root=s' => \$root_opt, 'help|?' => \$help_opt) or usage();
+usage() if $help_opt;
+
+my $cmd = shift @ARGV;
+usage('a command is required') unless length($cmd);
+
+command_dispatch($cmd);
+exit(0);
+
+
+### Command dispatch
+
+sub run (&;$) {
+  my $p = $_[1] || `$FindBin::Bin/orc-project-root`;
+  return $_[0]->(path($p)) if $p;
+  exit(1);
+}
+
+sub command_dispatch {
+  my ($cmd) = @_;
+
+  if ($cmd eq 'list') {
+    run { print "$_\n" for _find_cpanfiles($_[0]) } $root_opt;
+  }
+  elsif ($cmd eq 'merge') {
+    run { print _merge_cpanfile($_[0]) } $root_opt;
+  }
+  elsif ($cmd eq 'install') {
+    run {
+      my $tmp = Path::Tiny->tempfile;
+      $tmp->spew(_merge_cpanfile($_[0]));
+
+      delete $ENV{LANG};
+      exec('cpanm', '--quiet', '--notest', @ARGV, '--cpanfile', $tmp->stringify, '--installdeps', '.');
+    }
+    $root_opt;
+  }
+  else {
+    usage("invalid command '$cmd'");
+  }
+}
+
+
+#### Utils
+
+sub _find_cpanfiles {
+  my ($root) = @_;
+  my $i = $root->iterator({ recurse => 1 });
+  my $self = path($FindBin::Bin)->child($FindBin::Script)->realpath;
+
+  my @found;
+  while (my $f = $i->()) {
+    next unless $f->basename =~ m/.*cpanfile$/;    ## no point going on if we don't have cpanfile on our name...
+
+    my $r = $f->relative($root);
+    next if $r eq 'cpanfile';                      ## skip root cpanfile, we'll update that
+    next if $r =~ m{^local/};                      ## skip Carton install dir
+    next if $r =~ m{^.git/};                       ## skip git dir also
+    next if $f eq $self;                           ## We have cpanfile on our name too ;)
+
+    push @found, $f;
+  }
+
+  return wantarray ? @found : \@found;
+}
+
+sub _merge_cpanfile {
+  my ($root) = @_;
+
+  # FIXME: the files we found might not be valid cpanfiles... how to test for that?
+  # first attempt, restrict the name of the files
+  my @cpanfiles = grep { $_->basename eq 'cpanfile' or $_->basename =~ m/\Q.cpanfile\E$/ } _find_cpanfiles($root);
+  my @prereqs = map { Module::CPANfile->load($_)->prereqs } @cpanfiles;
+  my $reqs = CPAN::Meta::Prereqs->new->with_merged_prereqs(\@prereqs);
+
+  my $header = join("\n",
+    '### *** DO NOT EDIT *** GENERATED AUTOMATICALY BY orc-cpanfile ***',
+    '###',
+    '### Merge of the following cpanfiles',
+    map {"###   * $_"} map { $_->relative($root) } @cpanfiles,
+  );
+
+  return "$header\n\n" . Module::CPANfile->from_prereqs($reqs->as_string_hash)->to_string;
+}
