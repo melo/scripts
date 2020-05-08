@@ -90,6 +90,7 @@ sub _find_cpanfiles {
     my $r = $f->relative($root);
     next if $r eq 'cpanfile';                      ## skip root cpanfile, we'll update that
     next if $r =~ m{^local/};                      ## skip Carton install dir
+    next if $r =~ m{^.docker-perl-local/};         ## skip Carton install dir via melopt/perl-alt setup
     next if $r =~ m{^.git/};                       ## skip git dir also
     next if $f eq $self;                           ## We have cpanfile on our name too ;)
 
