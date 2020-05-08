@@ -2,46 +2,47 @@
 
 use strict;
 use warnings;
-use Cwd;
-use File::Spec::Functions qw( splitdir catdir catfile );
-use JSON;
-use Getopt::Long;
 use Data::Dump ();
-use DateTime;
+use Getopt::Long;
 use HTTP::Tiny;
-
-my %cfg = (
-  verbose => 0,
-  quiet   => 0,
-);
-my $ok = GetOptions(\%cfg, "help", "verbose+", "quiet", "completion", "dryrun|n");
-usage() unless $ok;
-usage() if $cfg{help};
+use JSON::MaybeXS;
+use Path::Tiny;
+use Time::Moment;
 
 my @rules_prj_locations = ([], ['devops'], ['dev', 'ops', 'etc']);
 
+my %opts = (
+  verbose => 0,
+  quiet   => 0,
+  current => 0,
+);
 
-dispatch_command(\%cfg, @ARGV);
+my $ok = GetOptions(\%opts, "help", "verbose+", "quiet", "completion", "current", "dryrun|n", "restart", "filter=s");
+usage() unless $ok;
+usage() if $opts{help};
+usage() unless @ARGV;
 
+$opts{restart} = 1 if exists $opts{filter} and $opts{filter};
+
+dispatch_command(@ARGV);
+
+
+####################
+# Command dispatcher
 
 sub dispatch_command {
-  my ($cfg, $cmd, @args) = @_;
-
-  if (!defined($cmd)) {
-    usage();
-    return;
-  }
+  my ($cmd, @args) = @_;
 
   if ($cmd eq 'deploy') {
-    load_cfg($cfg);
-    deploy($cfg, @args);
+    my $pcfg = load_cfg();
+    deploy($pcfg, @args);
   }
   elsif ($cmd eq 'environments') {
-    load_cfg($cfg);
-    environments($cfg);
+    my $pcfg = load_cfg();
+    environments($pcfg);
   }
   elsif ($cmd eq 'setup_bash_complete') {
-    setup_bash_completion($cfg);
+    setup_bash_completion();
   }
   else {
     usage("Command '$cmd' not understood");
@@ -51,130 +52,586 @@ sub dispatch_command {
 }
 
 
-##########
-# Commands
+################
+# Deploy command
 
 sub deploy {
-  my ($cfg, $env) = @_;
-  my $pcfg = $cfg->{project};
-  my $pname = $pcfg->{project}{name} || (find_project_root())[-1];
+  my ($pcfg, $env, @rest) = @_;
+  my $root = project_root();
+  my $pname = $pcfg->{project}{name} || $root->basename;
 
   usage('Deploy requires an environment as parameter.',
-    'Valid values are: ' . join(', ', sort keys %{ $pcfg->{environments} }))
+    'Valid values are: ' . join(', ', sort grep {$_} keys %{ $pcfg->{environments} }))
     unless defined $env;
+
+
+  ### Start from a good place
+  chdir($root);
+
 
   ### Decide which environment to use
   my $ecfg = $pcfg->{environments}{$env};
   usage("Environment '$env' not found in rules.prj") unless $ecfg;
   debug("Using environment '$env'");
+  $ecfg = { %{ $pcfg->{defaults} || {} }, %$ecfg };
+
 
   ### Prepare base rsync command to run
-  my $rsync = $pcfg->{commands}{rsync};
-  $rsync = [split(/\s+/, $rsync)] if $rsync && !ref($rsync);
-  $rsync ||= ['rsync', '-a'];
+  my $rsync = _generate_rsync_command($pcfg, $ecfg);
 
-  ### Include excludes
-  if (my $excl = $pcfg->{paths}{exclude}) {
-    $excl = [$excl] unless ref($excl) eq 'ARRAY';
-    push @$rsync, map { ('--exclude', $_) } @$excl;
-  }
-
-  ### Add common rsync options
-  push @$rsync, '-v' if $cfg->{verbose} || $pcfg->{verbose};
-  push @$rsync, '-n' if $cfg->{dryrun};
-  push @$rsync, "$cfg->{root}/";
 
   ### Hosts to use
-  my @hosts = @{ $ecfg->{hosts} || [] };
-  push @hosts, $ecfg if $ecfg->{host};
-  fatal("Environment '$env' missing 'host' or 'hosts' entry: $ecfg")
+  my $hosts = delete($ecfg->{hosts}) || delete($ecfg->{host});
+  $hosts = [$hosts] if $hosts and ref($hosts) ne 'ARRAY';
+  $hosts = [] unless $hosts;
+  my @hosts = @$hosts;
+  fatal("Environment '$env' missing 'host' or 'hosts' entry: ", $ecfg)
     unless @hosts;
 
+
   ### Check for proper branch
-  if (my $branch_name = $ecfg->{branch}) {
+  if (my $branch_name = delete $ecfg->{branch}) {
     my $cur_branch = _current_branch_name();
     fatal("Current branch '$cur_branch' not the expected one '$branch_name")
       unless $cur_branch eq $branch_name;
   }
 
+
   ### Check for tags
-  if ($ecfg->{tag}) {
-    _tag_release($env);
-  }
+  _tag_release($env) if delete $ecfg->{tag};
+
 
   ### Describe the current release
-  END { unlink('.release'); unlink('.deployed_env') }
-  system('git describe --always --tags > .release');
-  system('pwd >> .release');
-  system('git show HEAD >> .release');
-  do { my $fh; open($fh, '>', '.deployed_env') and print $fh $env };
+  my @release_info;
+  for my $cmd ('git rev-parse --short HEAD', 'pwd', 'git show --stat') {
+    push @release_info, scalar(`$cmd`);
+    chomp $release_info[-1];
+  }
+  _write_control_file('.release',         @release_info);
+  _write_control_file('.release_version', my $version = $release_info[0]);
+  _write_control_file('.deployed_env',    $env);
+  _write_control_file('.release_restart', 'restart') if $opts{restart};
+
+
+  ### If we use git and we have submodules, make sure they are up-to-date
+  if (-d '.git' and -f '.gitmodules') {
+    debug('Updating git submodules');
+    unless ($opts{dryrun}) {
+      system('git', 'submodule', 'update', '--recursive', '--init') and die "FATAL: git submodule update failed\n";
+    }
+  }
+
 
   ## run pre-deploy script
-  if (exists $ecfg->{pre_deploy}) {
-    my @cmd = ($ecfg->{pre_deploy});
-
-    debug('Pre deploy command:', \@cmd);
-    unless ($cfg{dryrun}) {
-      system(@cmd) and die "FATAL: pre_deploy script failed\n";
+  my @pre_deploy_cmds = grep { defined() } ($pcfg->{pre_deploy}, $ecfg->{pre_deploy});
+  for my $cmd (@pre_deploy_cmds) {
+    $cmd = [$cmd] unless ref($cmd);
+    debug('Pre deploy command:', @$cmd);
+    unless ($opts{dryrun}) {
+      system(@$cmd) and die "FATAL: pre_deploy script failed\n";
     }
   }
+
 
   ### rsync to each one
-  info("Deploying project");
+  info("Deploying project '$pname'");
   foreach my $host (@hosts) {
+    $host = { %$ecfg, %$host };    ## Merge all configs!
     fatal("Env '$env' with missing 'host'") unless $host->{host};
 
-    my @cmd  = @$rsync;
-    my $info = $host->{host};
 
-    ### prepare the SSH transport settings
-    push @cmd, '-e', 'ssh';
-    if ($host->{user}) {
-      $cmd[-1] .= " -l $host->{user}";
-      $info = "$host->{user}\@$info";
+    ## Skip it, something is wrong
+    if ($host->{skip}) {
+      info("Skipping host '$host->{host}', reason: $host->{skip}");
+      next;
     }
-    if ($host->{port}) {
-      $cmd[-1] .= " -p $host->{port}";
-      $info .= ":$host->{port}";
-    }
-    $info = "host '$info'";
 
-    my $path = $host->{path} || $ecfg->{path};
+
+    ## prepare post-deploy script
+    my $post_deploy_script = _create_post_deploy_script($host, $version, $env, @rest);
+
+
+    ## define our SSH command
+    my @ssh_cmd = ('ssh', '-A');
+
+    push @ssh_cmd, '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/ssh-controlmaster-%h-%p-%r', '-o',
+      'ControlPersist=3600'
+      unless $host->{skip_ssh_control_master} or $ENV{PRJ_OPT_SKIP_SSH_CONTROL_MASTER};
+
+    my $host_info = $host->{host};
+    if (my $user = $host->{user}) {
+      push @ssh_cmd, '-l', $user;
+      $host_info = "$user\@$host_info";
+    }
+    if (my $port = $host->{port}) {
+      push @ssh_cmd, '-p', $port;
+      $host_info .= ":$port";
+    }
+    if (my $key = $host->{key}) {
+      push @ssh_cmd, '-i', _find_ssh_key($host_info, $key);
+    }
+    $host_info = "host '$host_info'";
+
+
+    ## Prepare and do the rsync
+    my @cmd = (@$rsync, '-e', join(' ', @ssh_cmd));
+
+    my $path = $host->{path};
     push @cmd, join(':', $host->{host}, $path);
-    $info .= ", path '$path'";
+    $host_info .= ", path '$path'";
+    info(".... targetting $host_info");
 
     debug('Rsync command:', \@cmd);
-    info(".... deploy to $info");
-    system(@cmd) unless $cfg{dryrun};
+    info("........ deploy files");
+    system(@cmd) unless $opts{dryrun};
 
-    if (exists $ecfg->{post_deploy}) {
-      @cmd = ('ssh', $host->{host});
-      push(@cmd, '-v') if $cfg->{verbose} || $pcfg->{verbose};
-      push(@cmd, '-l', $host->{user}) if $host->{user};
-      push(@cmd, '-p', $host->{port}) if $host->{port};
-      push @cmd, "cd " . ($host->{path} || $ecfg->{path}) . " && $ecfg->{post_deploy}";
 
-      debug('Post deploy command:', \@cmd);
-      system(@cmd) unless $cfg{dryrun};
+    ## Run post-deploy script
+    info("........ run post-deploy script");
+    if   ($opts{verbose}) { push(@ssh_cmd, '-v') }
+    else                  { push(@ssh_cmd, '-q') }
+    push @ssh_cmd, '-t', $host->{host}, "cd '$path' && ./$post_deploy_script '$env'";
+
+    debug('Post deploy command:', \@ssh_cmd);
+    unless ($opts{dryrun}) {
+      my $err = system(@ssh_cmd);
+      fatal("post deploy script exited != 0: $err") if $err;
     }
   }
 
-  ## run cleanup-deploy script
-  if (exists $ecfg->{cleanup_deploy}) {
-    my @cmd = ($ecfg->{cleanup_deploy});
 
-    debug('Cleanup deploy command:', \@cmd);
-    unless ($cfg{dryrun}) {
-      system(@cmd) and die "FATAL: cleanup_deploy script failed\n";
+  ### run cleanup-deploy script
+  my @cleanup_cmds = grep {defined} ($ecfg->{cleanup_deploy}, $pcfg->{cleanup_deploy});
+  for my $cmd (@cleanup_cmds) {
+    $cmd = [$cmd] unless ref($cmd);
+    debug('Cleanup deploy command:', @$cmd);
+    unless ($opts{dryrun}) {
+      system(@$cmd) and die "FATAL: cleanup_deploy script failed\n";
     }
   }
 
-  notify($cfg, "Sucessfully deployed '$env' for project '$pname'", $pname, $env);
+
+  ### Do notifications after the deploy
+  notify(
+    { pcfg           => $pcfg,
+      ecfg           => $ecfg,
+      msg            => "Sucessfully deployed '$env' env, for project '$pname', commit $release_info[0]",
+      project_name   => $pname,
+      env            => $env,
+      commit         => $release_info[0],
+      workdir        => $release_info[1],
+      commit_message => $release_info[2],
+    }
+  );
+
   return;
 }
 
+
+sub _create_post_deploy_script {
+  my ($host, $version, $env, @rest) = @_;
+
+  my $script = <<'EOS';
+    #!/bin/bash
+
+    deploy_env="$1"
+    if [ -z "$deploy_env" ] ; then
+      echo "**** FATAL: post_deploy.sh requires a single parameter, the environment"
+      exit 1
+    fi
+
+    set -e
+EOS
+
+  $script .= "set -x\n" if $opts{verbose};
+
+  $script .= "PRJ_ENV='$env'\nPRJ_DEPLOY_VERSION='$version'\n";
+  $script .= "PRJ_USE_CURRENT='$version'\n" if $opts{current};
+  $script .= "PRJ_RESTART=1\n" if exists $opts{restart};
+  $script .= "PRJ_RESTART_FILTER='$opts{filter}'\n" if exists $opts{filter} and $opts{filter};
+  $script .= "export PRJ_ENV PRJ_DEPLOY_VERSION PRJ_USE_CURRENT PRJ_RESTART PRJ_RESTART_FILTER\n";
+
+  if (my $aws_profile = $host->{aws_profile}) {
+    my $k = _load_aws_credentials($aws_profile);
+    fatal("could not load AWS profile '$aws_profile'") unless $k->{aws_access_key_id} and $k->{aws_secret_access_key};
+
+    $script .= "AWS_ACCESS_KEY_ID='$k->{aws_access_key_id}'\n";
+    $script .= "AWS_SECRET_ACCESS_KEY='$k->{aws_secret_access_key}'\n";
+    $script .= "AWS_DEFAULT_REGION='$k->{region}'\n" if $k->{region};
+    $script .= "export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION\n";
+  }
+
+  if (my $envs = $host->{environment}) {
+    $envs = [$envs] unless ref($envs) eq 'ARRAY';
+    my @to_export;
+    for my $e (@$envs) {
+      for my $k (keys %$e) {
+        $script .= "$k=$e->{$k}\n";
+        push @to_export, $k;
+      }
+    }
+    $script .= "export @to_export\n";
+  }
+
+  $script .= "cd \"\$HOME\"\n";
+
+  if ($host->{perl_version} or $host->{install_cpan_deps} or $host->{use_carton}) {
+    $script .= <<'EOS';
+
+    if [ -e ./.plenv ] ; then
+      USE_PLENV=1
+      PATH="$HOME/.plenv/bin:$PATH"
+      export USE_PLENV PATH
+      eval "$(plenv init -)"
+    else
+      if [ -e ./.perlbrew/init ] ; then
+        source ./.perlbrew/init
+      fi
+
+      if [ -z "$PERLBREW_ROOT" ] ; then
+        ## FIXME: should try more places...
+        PERLBREW_ROOT=/home/spencer/perl5/perlbrew
+        export PERLBREW_ROOT
+      fi
+
+      if [ -e "$PERLBREW_ROOT/etc/bashrc" ] ; then
+        source $PERLBREW_ROOT/etc/bashrc
+      fi
+
+EOS
+
+    if (my $pv = $host->{perl_version}) {
+      ## FIXME: should we remove release/deps/ whenever we create a new
+      ## perlbrew lib to make sure all deps are recompiled to newest perl?
+      $script .= "if [ ! -d './.perlbrew/libs/$pv' ] ; then\n";
+      $script .= "  perlbrew lib create $pv\n";
+      $script .= "  perlbrew switch $pv\n";
+      $script .= "  if [ -d './service/.s6-svscan' ] ; then\n";
+      $script .= "    /command/s6-svscanctl -t service\n";
+      $script .= "  fi\n";
+      $script .= "fi\n";
+
+      $script .= "perlbrew switch $pv\n";
+    }
+
+    $script .= "fi\n"; ## else use perlbrew
+  }
+
+  $script .= "cd '$host->{path}'\n\n";
+
+  if (my $pv = $host->{perl_version}) {
+    $script .= 'if [ -n "$USE_PLENV" ] ; then' ."\n";
+    $script .= "  plenv local \"$host->{perl_version}\"\n";
+    $script .= "fi\n";
+  }
+
+  if ($host->{install_cpan_deps}) {
+    $script .= <<'EOS';
+      echo "** Installing CPAN dependencies"
+      curl --silent -o .cpanm -L http://cpanmin.us/
+      chmod 755 .cpanm
+      mkdir -p ../deps
+
+      submodules=""
+      if [ -d "elib" ] ; then
+        submodules=`find elib -maxdepth 1 -mindepth 1 -type d -print`
+      fi
+
+      for subdir in common "${deploy_env}" ; do
+        for root_dir in "." $submodules ; do
+          for deps_root in "$root_dir/dev/ops/etc/deps" "$root_dir/dev/ops/deps" ; do
+            echo "    ... for directory ${deps_root}/${subdir}"
+            for cpanfile in `ls -1 ${deps_root}/${subdir}/*cpanfile 2>/dev/null` ; do
+              echo "    ...... checking ${cpanfile}"
+              LANG= ./.cpanm -L ../deps --quiet --notest --cpanfile "${cpanfile}" --installdeps .
+            done
+          done
+        done
+      done
+      rm -f .cpanm
+
+EOS
+  }
+
+  if (my $carton = $host->{use_carton}) {
+    if ($carton =~ m/^perl/) {
+      $script .= <<"EOS";
+        echo "** Temporarily switching to perl $carton to make carton happy"
+        perlbrew use '$carton'
+
+EOS
+    }
+
+    $script .= <<'EOS';
+      echo "** Installing CPAN dependencies (using Carton)"
+      perl -v | head -3
+      perl `which cpanm` -n Carton ExtUtils::MakeMaker
+      perl `which carton` install --deployment
+      rm -rf local/cache
+EOS
+  }
+
+  $script .= _generate_services_scripts(@_) if $host->{services_mgmt};
+  if (exists $host->{post_deploy} and $host->{post_deploy}) {
+    $script .= "echo '** Starting post-deploy script \"$host->{post_deploy}\"'\n";
+    $script .= "( $host->{post_deploy} @rest )\n\n";
+  }
+
+  my $script_path = '.post-deploy.sh';
+  $script .= "rm -f '$script_path'\n\n";
+
+  $script =~ s/^    //gm;    ## we used some indentation to make it easier to write, remove it now
+  _write_control_file($script_path, $script)->chmod(0755);
+
+  return $script_path;
+}
+
+sub _generate_services_scripts {
+  my ($host) = @_;
+
+  my $script   = _gen_srv_utils(@_);
+  my @services = _scan_services();
+  return '' unless @services;
+
+  for my $srv (@services) {
+    my $name = $srv->{name};
+    my $scfg = load_json($srv->{spec_file});
+
+    my $cmd = $scfg->{cmd};
+    next unless $cmd;
+    $cmd =~ s/[\r\n]+/ /gsm;
+    $cmd =~ s/\Q{{ENV:\E(.+?)\Q}}\E/$ENV{$1}||'--ENV-$1-NOT-FOUND--'/gesm;
+    $cmd =~ s/\\/\\\\/gsm;
+    $cmd =~ s/"/\\"/gsm;
+
+    $script .= qq{      should_start_service="$cmd"\n};
+    $script .= _gen_check_tags($name, $scfg->{tags}) if $scfg->{tags};
+
+    my $app_name = $scfg->{application_name} || '';
+    my $logger   = $scfg->{logger};
+    my $log_dir  = $scfg->{log_dir} || "\$HOME/log/service";
+    my $require_log_dir;
+    if (!$logger) {
+      $logger          = "/command/s6-log -bt \"$log_dir/\$service_name\"";
+      $require_log_dir = 1;
+    }
+    undef $logger if $scfg->{skip_logger};
+
+    $script .= <<"EOS";
+      if [ -n "\$should_start_service" ] ; then
+        mkdir -p "\$HOME/service/$name"
+EOS
+
+    if ($logger) {
+      $script .= <<"EOS";
+        mkdir -p "\$HOME/service/$name/log"
+        echo '#!/bin/sh' > "\$HOME/service/$name/log/run.new"
+        echo 'app_name="$app_name"' >> "\$HOME/service/$name/log/run.new"
+        echo 'service_name="$name"' >> "\$HOME/service/$name/log/run.new"
+        echo 'export service_name' >> "\$HOME/service/$name/log/run.new"
+        echo 'export app_name' >> "\$HOME/service/$name/log/run.new"
+EOS
+
+      if ($require_log_dir) {
+        $script .= qq{echo 'mkdir -p "$log_dir/$name"' >> "\$HOME/service/$name/log/run.new"\n};
+      }
+
+      $script .= <<"EOS";
+        echo 'exec $logger' >> "\$HOME/service/$name/log/run.new"
+        chmod 555 "\$HOME/service/$name/log/run.new"
+        mv -f "\$HOME/service/$name/log/run.new" "\$HOME/service/$name/log/run"
+EOS
+    }
+    else {    ## if we have a previous logger, we need to kill the entire service and rebuild it
+      $script .= <<"EOS";
+        if [ -e "\$HOME/service/$name/log" ] ; then
+          stop_service '$name'
+        fi
+EOS
+    }
+
+    $script .= <<"EOS";
+        echo '#!/bin/sh' > "\$HOME/service/$name/run.new"
+EOS
+
+    if ($scfg->{log_stderr}) {
+      $script .= <<"EOS";
+        echo "exec 2>&1" >> "\$HOME/service/$name/run.new"
+EOS
+    }
+
+    if (my $e = $scfg->{env}) {
+      die "FATAL: invalid service, field 'env' must be an object/hashRef\n" unless ref($e) eq 'HASH';
+      while (my ($k, $v) = each %$e) {
+        $script .= <<"EOS";
+          echo "$k='$v'" >> "\$HOME/service/$name/run.new"
+EOS
+      }
+      my $vars = join(' ', sort keys %$e);
+      $script .= <<"EOS";
+          echo "export $vars" >> "\$HOME/service/$name/run.new"
+EOS
+    }
+
+    if ($scfg->{chdir_project}) {
+      $script .= <<"EOS";
+          echo "cd \"\$HOME/$host->{path}\"" >> "\$HOME/service/$name/run.new"
+EOS
+    }
+
+    my $lock = '';
+    if (my $ln = $scfg->{lock_name}) {
+      $script .= <<"EOS";
+        echo "printf '** Lock service activated, key $ln, started at'" >> "\$HOME/service/$name/run.new"
+        echo "date" >> "\$HOME/service/$name/run.new"
+EOS
+
+      $lock = "consul lock";
+      $lock .= " -n $scfg->{lock_workers}" if $scfg->{lock_workers} and $scfg->{lock_workers} =~ m/^\d+$/;
+      $lock .= " -token $scfg->{lock_token}" if $scfg->{lock_token};
+      $lock .= " '$ln'";
+    }
+
+    $script .= <<"EOS";
+        echo "exec $lock \$should_start_service" >> "\$HOME/service/$name/run.new"
+        chmod 555 "\$HOME/service/$name/run.new"
+        mv -f "\$HOME/service/$name/run.new" "\$HOME/service/$name/run"
+
+        start_service '$name'
+      else
+        stop_service '$name'
+      fi
+EOS
+  }
+
+  $script .= _gen_cleanup_old_services();
+
+  return $script;
+}
+
+sub _scan_services {
+  my ($dir, $prefix) = @_;
+  $prefix ||= '';
+
+  $dir = path($dir || 'service');
+  my $it = $dir->iterator;
+
+  my @services;
+  while (my $srv = $it->()) {
+    my $name = $srv->basename;
+    if ($srv->is_dir and $name =~ m/^[a-zA-Z]/) {
+      push @services, _scan_services($srv, "${name}_");
+    }
+    elsif ($srv->is_file and $name =~ m/^([a-zA-Z][-\w\.]*)[.]json$/) {
+      push @services, { name => "$prefix$1", spec_file => $srv };
+    }
+  }
+
+  return @services;
+}
+
+sub _gen_srv_utils {
+  my ($host) = @_;
+
+  my $script = <<'EOS';
+
+    start_service () {
+      local srv="$1"
+      local srvs_dir="$HOME/service"
+      local srv_dir="$srvs_dir/$srv"
+      local log_srv_dir="$srv_dir/log"
+
+EOS
+
+  if (!$host->{skip_automatic_restart}) {
+    $script .= <<'EOS';
+      ## FIXME: what to do is $srv_dir/down exists? Maybe we should restart only if up?
+      if [ -e "$srv_dir/supervise" ] ; then
+          echo "... starting service '$srv'"
+          /command/s6-svc -ut "$srv_dir"
+          if [ -d "$log_srv_dir" ] ; then
+              /command/s6-svc -uh "$log_srv_dir"
+          fi
+      fi
+EOS
+  }
+
+  $script .= <<'EOS';
+      echo "... rescan service dir, looking to start service '$srv'"
+      /command/s6-svscanctl -a "$srvs_dir"
+
+      touch "$srvs_dir/.$srv.is-active"
+    }
+
+    stop_service () {
+      local srv="$1"
+      local srvs_dir="$HOME/service"
+      local srv_dir="$srvs_dir/$srv"
+      local log_srv_dir="$srv_dir/log"
+
+      if [ -d "$srv_dir" ] ; then
+          echo "... stopping service '$srv' at '$srv_dir'"
+          mv "$srv_dir" "$srvs_dir/.$srv"
+          /command/s6-svscanctl -an "$srvs_dir"
+
+          # s6-svwait -d "$srvs_dir/.$srv"
+          # if [ -d "$srvs_dir/.$srv/log" ] ; then
+          #     s6-svwait -d "$srvs_dir/.$srv/log"
+          # fi
+          sleep 1
+
+          rm -rf "$srvs_dir/.$srv"
+          rm -f "$srvs_dir/.$srv"
+      fi
+    }
+EOS
+
+  return $script;
+}
+
+sub _gen_check_tags {
+  my ($name, $tags) = @_;
+  $tags = join(' ', map {"'$_'"} @$tags);
+
+  return <<"EOS";
+      found_tag=''
+      echo -n '... checking tags:'
+      for tag in $tags ; do
+          echo -n " \$tag"
+          if [ -e "/etc/orchid/tags/\$tag" ] ; then
+              echo -n ' (found!)'
+              found_tag="\$tag"
+          fi
+      done
+      echo
+      if [ -z "\$found_tag" ] ; then
+          echo "... no required tags found, skipping service '$name'"
+          should_start_service=''
+      fi
+EOS
+}
+
+sub _gen_cleanup_old_services {
+  return <<'EOS';
+  srv_dir="$HOME/service"
+  if [ -d "$srv_dir" ] ; then
+      for srv in `ls -1 $srv_dir` ; do
+          if [ ! -e "$srv_dir/.$srv.is-active" ] ; then
+              echo "... service $srv not found in PROJECT/service/${srv}.json"
+              stop_service $srv
+          fi
+          rm -f "$srv_dir/.$srv.is-active"
+      done
+  fi
+EOS
+}
+
+
+###################
+# List environments
+
 sub environments {
-  my ($cfg) = @_;
+  my ($pcfg) = @_;
 
   my $pretty = sub { print @_, "\n" };
   if (is_tty()) {
@@ -182,9 +639,12 @@ sub environments {
     $pretty = sub { print ' * ', @_, "\n" };
   }
 
-  my $pcfg = $cfg->{project};
-  $pretty->($_) for sort keys %{ $pcfg->{environments} };
+  $pretty->($_) for sort grep {$_} keys %{ $pcfg->{environments} || [] };
 }
+
+
+#########################
+# Bash completion support
 
 sub setup_bash_completion {
   print <<'EOBC';
@@ -234,9 +694,12 @@ sub usage {
   print STDERR <<EOU;
 Usage: prj COMMAND ARGS
 
-The current list of COMMANDs is:
+Available COMMAND's:
 
-    deploy    deploys current version to an environment
+    deploy         deploys current version to an environment
+    environments   list all the available environments
+
+    setup_bash_complete    generate bash code for completion
 
 EOU
 
@@ -252,19 +715,19 @@ EOU
 # Logger
 
 sub info {
-  return if $cfg{quiet};
+  return if $opts{quiet};
   return _log('INFO', @_);
 }
 
 sub debug {
-  return if $cfg{quiet};
-  return unless $cfg{verbose} > 1;
+  return if $opts{quiet};
+  return unless $opts{verbose} > 1;
 
   return _log('DEBUG', @_);
 }
 
 sub error {
-  return if $cfg{quiet};
+  return if $opts{quiet};
   return _log('ERROR', @_);
 }
 
@@ -286,85 +749,171 @@ sub _log {
   return;
 }
 
+
 #######
 # Utils
 
-sub load_cfg {
-  my ($cfg) = @_;
-  my $root = $cfg{root} ||= find_project_root();
+sub is_tty { return -t \*STDOUT }
 
-  for my $subdir (@rules_prj_locations) {
-    my $filename = catfile($root, @$subdir, 'rules.prj');
-    next unless open(my $fh, '<', $filename);
-    local $/;
-    $cfg->{project} = decode_json(<$fh>);
-    close($fh);
-    return;
+sub load_cfg {
+  my $root = project_root();
+
+  my @files = _search_config_files($root);
+  for my $file (@files) {
+    my $c = load_json($file);
+    return $c if defined $c;
   }
 
-  fatal("Could not open 'rules.prj' file on these directories: "
-      . join(', ', map { catdir($root, @$_) } @rules_prj_locations));
+  fatal(join("\n  * ", "Could not open any of these files for configuration:", @files));
 }
 
-sub find_project_root {
+sub load_json {
+  my ($file) = @_;
+
+  return unless $file->is_file;
+  return JSON::MaybeXS->new->relaxed->utf8->decode($file->slurp);
+}
+
+{
   my $project_root;
 
-  my @cwd = splitdir(getcwd());
-  do {
-    my $cwd = catdir(@cwd);
+  sub project_root {
+    return $project_root if $project_root;
 
-    for my $subdir (@rules_prj_locations) {
-      $project_root = $cwd if -e catfile($cwd, @$subdir, 'rules.prj');
-    }
+    my $path = Path::Tiny->cwd;
+    my @dirs;
+    do {
+      push @dirs, $path;
 
-    fatal("Could not find project root (was looking for rules.prj in "
-        . join(', ', map { catdir('CWD', @$_) } @rules_prj_locations) . ")")
-      if !$project_root and ($cwd eq $ENV{HOME} or scalar(@cwd) == 1);
+      my @files = _search_config_files($path);
+      $project_root = $path if @files;
 
-    pop @cwd;
-  } while (!$project_root);
+      fatal(join("\n  * ", "Could not find project root, tried this directories:", @dirs))
+        if !$project_root and ($path eq $ENV{HOME} or $path eq Path::Tiny->rootdir);
 
-  return @cwd if wantarray;
-  return $project_root;
+      $path = $path->parent;
+    } while (!$project_root);
+
+    return $project_root;
+  }
 }
 
-sub notify {
-  my ($cfg, $message, $proj, $env) = @_;
+sub _search_config_files {
+  my ($root) = @_;
 
-  return if $cfg->{dryrun};
-
-  my $ncfg = $cfg->{project}{environments}{$env}{notify};
-  return unless $ncfg;
-
-  $ncfg = { growlnotify => 1 } if $ncfg and not ref($ncfg);
-
-  if ($ncfg->{growlnotify}) {
-    if (my $gn = _has_cmd('growlnotify')) {
-      system($gn, '-m', $message, 'prj deploy status');
-    }
-    else {
-      error('Could not find growlnotify command line tool');
+  my @found;
+  for my $dir (@rules_prj_locations) {
+    for my $file ('.prj_rules', 'rules.prj') {
+      my $f = $root->child(@$dir, $file);
+      push @found, $f if $f->exists;
     }
   }
 
-  notify_hipchat($ncfg->{hipchat}, $cfg, $message, $proj, $env) if $ncfg->{hipchat};
+  return @found;
+}
+
+sub _generate_rsync_command {
+  my ($pcfg, $ecfg) = @_;
+
+  my $rsync = $pcfg->{commands}{rsync} || 'rsync -a --delete';
+  $rsync = [split(/\s+/, $rsync)] if $rsync && !ref($rsync);
+
+  ### Include excludes
+  my $excl = $pcfg->{paths}{exclude} || [
+    ".git",                ## No need to send source control
+    "elib/*/.git",         ## No need to send source control
+    "elib/*/elib/*/.git",  ## No need to send source control
+    "supervise",           ## Supervise stuff
+    "main-*",              ## Supervise stuff
+    "local",               ## Perl deps
+    "node_modules",        ## Node deps
+    ".docker-perl-local",  ## Perl deps when using docker
+    ".vscode",             ## editor files
+
+  ];
+  $excl = [$excl] unless ref($excl) eq 'ARRAY';
+
+  if (my $more = $pcfg->{paths}{more_excludes}) {
+    $more = [$more] unless ref($more) eq 'ARRAY';
+    push @$excl, @$more;
+  }
+  if ($excl and @$excl) {
+    push @$rsync, map { ('--exclude', $_) } @$excl;
+  }
+
+  ### Add common rsync options
+  push @$rsync, '-v' if $opts{verbose} || $ecfg->{verbose};
+  push @$rsync, '-n' if $opts{dryrun};
+  push @$rsync, project_root() . '/';
+
+  return $rsync;
+}
+
+
+################
+## Notifications
+
+sub notify {
+  my ($args) = @_;
+  my $pcfg = $args->{pcfg};
+
+  return if $opts{dryrun};
+
+  my $ncfg = $pcfg->{notify};
+  return unless $ncfg;
+
+  $ncfg = [$ncfg] unless ref($ncfg) eq 'ARRAY';
+  for my $agent (@$ncfg) {
+    if ($agent->{type} eq 'loggly') { notify_loggly($args, $agent) }
+    elsif ($agent->{type} eq 'hipchat') { notify_hipchat($args, $agent) }
+    elsif ($agent->{type} eq 'growl') { notify_growl($args, $agent) }
+    elsif ($agent->{type} eq 'osx') { notify_osx($args, $agent) }
+  }
 
   return;
 }
 
+sub notify_osx {
+  my ($args) = @_;
+
+  if (my $gn = _has_cmd('osascript')) {
+    my $cmd = "osascript -e 'display notification \"" . $args->{msg} . "\" with title \"prj deploy status\"'";
+    debug("Notification osx: $cmd");
+    system($cmd);
+  }
+  else {
+    error('Could not find osascript command line tool');
+  }
+}
+
+sub notify_growl {
+  my ($args) = @_;
+
+  if (my $gn = _has_cmd('growlnotify')) {
+    my @cmd = ($gn, '-m', $args->{msg}, 'prj deploy status');
+    debug("Notification growl: ", join(' ', @cmd));
+    system(@cmd);
+  }
+  else {
+    error('Could not find growlnotify command line tool');
+  }
+}
+
 sub notify_hipchat {
-  my ($hcfg, $cfg, $msg, $prod, $env) = @_;
+  my ($args, $agent_cfg) = @_;
 
   my $ua  = _ua();
   my $res = $ua->post_form(
-    'https://api.hipchat.com/v1/rooms/message?format=json&auth_token=' . $hcfg->{token},
-    { room_id        => $hcfg->{room_id},
-      from           => 'prj cmd line',
-      message        => "$msg (by $ENV{USER})",
+    'https://api.hipchat.com/v1/rooms/message?format=json&auth_token=' . $agent_cfg->{token},
+    { room_id        => $agent_cfg->{room_id},
+      from           => $agent_cfg->{color} || 'prj cmd line',
+      message        => "$args->{msg} (by $ENV{USER})",
       message_format => 'text',
-      notify => exists $hcfg->{notify_room} ? $hcfg->{notify_room} : 1,
+      color          => $agent_cfg->{color} || 'purple',
+      notify => exists $agent_cfg->{notify_room} ? $agent_cfg->{notify_room} : 1,
     }
   );
+  debug("Notification hipchat: status is $res->{status}");
   if ($res->{status} == 200) {
     my $answer = eval { decode_json($res->{content}) };
     return if $answer and $answer->{status} eq 'sent';
@@ -372,17 +921,46 @@ sub notify_hipchat {
   error("Failed to notify hipchat: $res->{status} - $res->{content}");
 }
 
-sub is_tty { return -t \*STDOUT }
+sub notify_loggly {
+  my ($args, $agent_cfg) = @_;
 
-sub _has_cmd {
-  my ($cmd) = @_;
+  my $tags = join(',', 'prjCodePush', @{ $agent_cfg->{tags} || [] });
+  my %clean = map { $_ => $args->{$_} } qw(workdir project_name msg env commit commit_message);
+  $clean{timestamp} = Time::Moment->now_utc->to_string;
 
-  for my $path (split(/:/, $ENV{PATH})) {
-    my $fn = catfile($path, $cmd);
-    return $fn if -x $fn;
+  my $ua = _ua();
+  my $res =
+    $ua->post("http://logs-01.loggly.com/inputs/$agent_cfg->{token}/tag/$tags/", { content => encode_json(\%clean) });
+  debug("Notification Loggly: status is $res->{status}");
+  if ($res->{status} == 200) {
+    my $answer = eval { decode_json($res->{content}) };
+    return if $answer and $answer->{response} eq 'ok';
+  }
+  error("Failed to notify loggly: $res->{status} - $res->{content}");
+}
+
+
+#################################
+# Write and cleanup control files
+
+{
+  my @paths_to_clean;
+
+  END {
+    for (@paths_to_clean) {
+      unlink($_) if -e $_;
+    }
   }
 
-  return;
+  sub _write_control_file {
+    my $path = project_root()->child(shift);
+    push @paths_to_clean, "$path";
+
+    $path->remove;
+    $path->spew_utf8(map {"$_\n"} @_);
+
+    return $path;
+  }
 }
 
 
@@ -396,8 +974,8 @@ sub _ua {
 sub _tag_release {
   my ($env) = @_;
 
-  my $now = DateTime->now;
-  my $tag = join('-', 'release', $env, $now->ymd('') . $now->hms(''));
+  my $now = Time::Moment->now;
+  my $tag = join('-', 'release', $env, $now->strftime('%Y%m%d%H%M%S'));
 
   return system('git', 'tag', $tag);
 }
@@ -407,4 +985,66 @@ sub _current_branch_name {
   chomp $name;
   ($name) = $name =~ m{^refs/[^/]+/(.+)};
   return $name;
+}
+
+sub _load_aws_credentials {
+  my ($profile) = @_;
+  $profile = 'default' unless $profile;
+
+  my %c;
+
+  for my $cfg ('credentials', 'config') {
+    my $f = "$ENV{HOME}/.aws/$cfg";
+    next unless -e $f;
+
+    open(my $fh, '<', $f) or fatal("Could not open '$f': $!");
+    my $found;
+    while (my $l = <$fh>) {
+      chomp($l);
+      if (!$found) {
+        $found = 1 if $l =~ m{^\[(profile\s+)?$profile\]\s*$};
+        next;
+      }
+      else {
+        last if $l =~ m{^\[};
+        if ($l =~ m{\s*(\S+)\s*=\s*(.+?)\s*$}) {
+          $c{$1} = $2;
+        }
+      }
+    }
+    close($fh);
+    last if %c;
+  }
+
+  return \%c;
+}
+
+sub _find_ssh_key {
+  my ($host, $key_base_name) = @_;
+
+  my $ssh_dir = path($ENV{HOME}, '.ssh');
+  my $found;
+
+  for my $ext (qw( pem pub )) {
+    my $try = $ssh_dir->child("$key_base_name.$ext");
+    next unless $try->exists;
+    $found = $try;
+    last;
+  }
+
+  fatal("host '$host' requires key '$key_base_name.{pem,pub}' but could not find them in '$ssh_dir'")
+    unless $found;
+
+  return $found;
+}
+
+sub _has_cmd {
+  my ($cmd) = @_;
+
+  for my $path (split(/:/, $ENV{PATH})) {
+    my $fn = catfile($path, $cmd);
+    return $fn if -x $fn;
+  }
+
+  return;
 }
