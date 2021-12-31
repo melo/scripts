@@ -1,0 +1,3 @@
+[submodule "ext/zsh-bit-prompt"]
+	path = ext/zsh-bit-prompt
+	url = https://github.com/olivierverdier/zsh-git-prompt.git
