@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Data::Dump ();
-use Getopt::Long;
+use Getopt::Long qw( :config require_order pass_through );
 use HTTP::Tiny;
 use JSON::MaybeXS;
 use Path::Tiny;
@@ -17,7 +17,7 @@ my %opts = (
   current => 0,
 );
 
-my $ok = GetOptions(\%opts, "help", "verbose+", "quiet", "completion", "current", "dryrun|n", "restart", "filter=s");
+my $ok = GetOptions(\%opts, "help", "verbose+", "quiet", "completion", "current", "dryrun|n", "restart", "stash", "filter=s", "host=s", "quick");
 usage() unless $ok;
 usage() if $opts{help};
 usage() unless @ARGV;
@@ -74,6 +74,10 @@ sub deploy {
   usage("Environment '$env' not found in rules.prj") unless $ecfg;
   debug("Using environment '$env'");
   $ecfg = { %{ $pcfg->{defaults} || {} }, %$ecfg };
+
+
+  ### Stash if we should
+  system('git', 'stash', '-u') if $opts{stash} or $ecfg->{stash};
 
 
   ### Prepare base rsync command to run
@@ -180,6 +184,10 @@ sub deploy {
     push @cmd, join(':', $host->{host}, $path);
     $host_info .= ", path '$path'";
     info(".... targetting $host_info");
+    if ($opts{host} and $host_info !~ m/$opts{host}/) {
+      info("........ SKIP this host, '--host $opts{host}' doesn't match");
+      next;
+    }
 
     debug('Rsync command:', \@cmd);
     info("........ deploy files");
@@ -187,15 +195,20 @@ sub deploy {
 
 
     ## Run post-deploy script
-    info("........ run post-deploy script");
-    if   ($opts{verbose}) { push(@ssh_cmd, '-v') }
-    else                  { push(@ssh_cmd, '-q') }
-    push @ssh_cmd, '-t', $host->{host}, "cd '$path' && ./$post_deploy_script '$env'";
+    if ($opts{quick}) {
+      info("........ skip post-deploy script, --quick is in effect");
+    }
+    else {
+      info("........ run post-deploy script");
+      if   ($opts{verbose}) { push(@ssh_cmd, '-v') }
+      else                  { push(@ssh_cmd, '-q') }
+      push @ssh_cmd, '-t', $host->{host}, "cd '$path' && ./$post_deploy_script '$env'";
 
-    debug('Post deploy command:', \@ssh_cmd);
-    unless ($opts{dryrun}) {
-      my $err = system(@ssh_cmd);
-      fatal("post deploy script exited != 0: $err") if $err;
+      debug('Post deploy command:', \@ssh_cmd);
+      unless ($opts{dryrun}) {
+        my $err = system(@ssh_cmd);
+        fatal("post deploy script exited != 0: $err") if $err;
+      }
     }
   }
 
@@ -209,6 +222,10 @@ sub deploy {
       system(@$cmd) and die "FATAL: cleanup_deploy script failed\n";
     }
   }
+
+
+  ### Stash if we should
+  system('git', 'stash', 'pop') if $opts{stash} or $ecfg->{stash};
 
 
   ### Do notifications after the deploy
@@ -366,7 +383,7 @@ EOS
       echo "** Installing CPAN dependencies (using Carton)"
       perl -v | head -3
       perl `which cpanm` -n Carton ExtUtils::MakeMaker
-      perl `which carton` install --deployment
+      perl `which carton` install --verbose --deployment || true
       rm -rf local/cache
 EOS
   }
