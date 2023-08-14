@@ -1,17 +1,121 @@
-#!/bin/sh
+#!/usr/bin/perl
 
-deps="$*"
+use strict;
+use warnings;
+use Cwd;
+use Getopt::Long;
 
-exec docker run -it --rm -v `pwd`:/src melopt/alpine-perl-devel /bin/sh -c "
-  set -xe
-  mkdir /app
-  cd /app
-  if [ -n '$deps' ] ; then
-    apk --no-cache add $deps
-  fi
-  cp /src/cpanfile .
-  mkdir -p /src/.docker-perl-local
-  ln -s /src/.docker-perl-local local
-  build-perl-deps
-  cp cpanfile.snapshot /src
-"
+sub usage {
+  print "Error: $@\n" if $@;
+
+  print <<EOU;
+Usage: x-perl-create-cpanfile-snapshot <options> [<deps>...]
+
+Use the current folder cpanfile to generate a fresh cpanfile.snapshot.
+
+Uses a volume to cache the installed modules, the follow-up runs will be much faster.
+
+If you need extra packages to install, just pass them along like this:
+
+    x-perl-create-cpanfile-snapshot libidn-dev file-dev
+
+
+Options:
+
+  --dryrun   Do everything except run Docker
+  --verbose  Show what is going on
+  --volume   Define the name of the persistent volume to use.
+             If none is used, we will construct a new name based
+             on the current work directory
+  --reset    Remove volume before starting, forces full rebuild
+  --shell    After the install is configured, start a shell
+
+  --all      Install all deps, including non-prod
+
+  --official Use offial Perl image
+EOU
+  
+  exit(1);
+}
+
+GetOptions(\my %cfg, 'help|?', 'volume', 'reset', 'shell', 'all', 'next', 'verbose', 'official', 'dryrun') or usage();
+usage() if $cfg{help};
+
+$cfg{verbose} = 1 if $cfg{dryrun};
+
+my $vrs = $cfg{official}? "perl" : "alpine";
+
+## use the project dir as volume name as a fallback
+my $cwd = getcwd();
+
+my $vol = $cfg{volume};
+unless ($vol) {
+  $vol = $cwd;
+  $vol =~ s/^$ENV{HOME}//;
+  $vol =~ s{^/}{}g;
+  $vol =~ s{/}{-}g;
+  $vol .= "-cpan-deps-for-$vrs";
+}
+l("use '$vol' as volume name");
+
+if ($cfg{reset}) {
+  l("remove volume '$vol', forcing full rebuild");
+  system('docker', 'volume', 'rm', $vol) and die "Error: failed to remove volume '$vol', exit code $!";
+}
+
+my $label = 'latest-build';
+$label = 'next-build' if $cfg{next};
+$label = "$vrs-$label";
+
+my $shell = $cfg{shell} || '';
+my $deps = join(' ', @ARGV);
+l("install deps: $deps");
+
+my $all = $cfg{all}? ' --all ' : '';
+
+$deps .= _fetch_deps_from_cpanfile($vrs);
+
+my $script = "
+    set -xe
+    if [ -n '$deps' ] ; then
+      if [ '$vrs' = 'perl' ] ; then
+        apt update
+        apt install -y $deps
+      else
+        apk --no-cache add $deps
+      fi
+    fi
+    rm -rf /deps/local
+    ln -s /cache-deps /deps/local
+    cd /src
+    pdi-build-deps --skip-snapshot --verbose $all
+    cp /deps/cpanfile.snapshot /src
+    if [ -n \"$shell\" ] ; then
+      exec /bin/sh
+    fi
+";
+l("Prepare script to run: $script");
+
+exec('docker', 'run', '-it', '--rm', '-v', "$vol:/cache-deps", '-v', "$cwd:/src", "melopt/perl-alt:$label", '/bin/sh', '-c', $script) unless $cfg{dryrun};
+
+sub l {
+  return unless $cfg{verbose};
+  print "* @_\n";
+}
+
+sub _fetch_deps_from_cpanfile {
+  my ($vrs) = @_;
+  l("Scan 'cpanfile' for $vrs deps");
+
+  open(my $fh, 'cpanfile') or return '';
+
+  my @deps;
+  while (<$fh>) {
+    push @deps, $1 if m/^#+\s+requires_package_$vrs\s+(.+)$/i;
+    push @deps, $1 if m/^#+\s+requires_package\s+(.+)$/i;
+  }
+
+  return '' unless @deps;
+  l('Found dependencies: ', @deps);
+  return join(' ', @deps);
+}
