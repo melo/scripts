@@ -390,8 +390,9 @@ EOS
 
   $script .= _generate_services_scripts(@_) if $host->{services_mgmt};
   if (exists $host->{post_deploy} and $host->{post_deploy}) {
-    $script .= "echo '** Starting post-deploy script \"$host->{post_deploy}\"'\n";
-    $script .= "( $host->{post_deploy} @rest )\n\n";
+    my $pds = join(' ', $host->{post_deploy}, @rest);
+    $script .= "echo '** Starting post-deploy script \"$pds\"'\n";
+    $script .= "( $pds )\n\n";
   }
 
   my $script_path = '.post-deploy.sh';
