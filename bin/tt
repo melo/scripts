@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+if [ -n "$1" -a "$1" = "build" ] ; then
+  cd ~/.scripts.d
+  docker build -t tools .
+  exit 0
+fi
+
+exec docker run -it --rm -v `pwd`:/app tools
