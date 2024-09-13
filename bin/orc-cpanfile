@@ -94,6 +94,7 @@ sub _find_cpanfiles {
     next if $r =~ m{^.git/};                       ## skip git dir also
     next if $f eq $self;                           ## We have cpanfile on our name too ;)
 
+    print STDERR "... using $r\n" if $ENV{DEBUG};
     push @found, $f;
   }
 
