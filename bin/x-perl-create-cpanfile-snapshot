@@ -32,18 +32,32 @@ Options:
 
   --all      Install all deps, including non-prod
 
-  --official Use offial Perl image
+  --official       Use official Perl image
+  --alpine         Use Alpine Perl image
+  --target=label   Use local Dockerfile with a specific target label
 EOU
-  
   exit(1);
 }
 
-GetOptions(\my %cfg, 'help|?', 'volume', 'reset', 'shell', 'all', 'next', 'verbose', 'official', 'dryrun') or usage();
+GetOptions(
+  \my %cfg, 'help|?',  'volume',   'reset',  'shell',  'all',
+  'next',   'verbose', 'official', 'alpine', 'dryrun', 'target=s'
+) or usage();
 usage() if $cfg{help};
 
 $cfg{verbose} = 1 if $cfg{dryrun};
 
-my $vrs = $cfg{official}? "perl" : "alpine";
+my $target = $cfg{target} || _fetch_target_label();
+l("target for image to use as dep: $target");
+
+my $single = 0;
+$single++ if $cfg{official};
+$single++ if $cfg{alpine};
+$single++ if $target;
+
+usage("Cannot use --official, --alpine, and --target=<target> together") if $single > 1;
+my $vrs = "perl";
+$vrs = "alpine" if $cfg{alpine};
 
 ## use the project dir as volume name as a fallback
 my $cwd = getcwd();
@@ -68,10 +82,10 @@ $label = 'next-build' if $cfg{next};
 $label = "$vrs-$label";
 
 my $shell = $cfg{shell} || '';
-my $deps = join(' ', @ARGV);
+my $deps  = join(' ', @ARGV);
 l("install deps: $deps");
 
-my $all = $cfg{all}? ' --all ' : '';
+my $all = $cfg{all} ? ' --all ' : '';
 
 $deps .= _fetch_deps_from_cpanfile($vrs);
 
@@ -96,7 +110,16 @@ my $script = "
 ";
 l("Prepare script to run: $script");
 
-exec('docker', 'run', '-it', '--rm', '-v', "$vol:/cache-deps", '-v', "$cwd:/src", "melopt/perl-alt:$label", '/bin/sh', '-c', $script) unless $cfg{dryrun};
+my $docker_tag = "melopt/perl-alt:$label";
+l(".... initial tag $docker_tag (target is $target)");
+if ($target) {
+  $docker_tag = lc($vol);
+  l(".... found target $target, new docker tag is $docker_tag");
+  system('docker', 'build', '--tag', $docker_tag, '--target', $target, '.');
+}
+l(".... final tag $docker_tag");
+exec('docker', 'run', '-it', '--rm', '-v', "$vol:/cache-deps", '-v', "$cwd:/src", $docker_tag, '/bin/sh', '-c', $script)
+  unless $cfg{dryrun};
 
 sub l {
   return unless $cfg{verbose};
@@ -105,9 +128,11 @@ sub l {
 
 sub _fetch_deps_from_cpanfile {
   my ($vrs) = @_;
-  l("Scan 'cpanfile' for $vrs deps");
+  my $fn = 'cpanfile.cfg';
+  $fn = 'cpanfile' unless -r $fn;
 
-  open(my $fh, 'cpanfile') or return '';
+  l("Scan '$fn' for $vrs deps");
+  open(my $fh, $fn) or return '';
 
   my @deps;
   while (<$fh>) {
@@ -118,4 +143,21 @@ sub _fetch_deps_from_cpanfile {
   return '' unless @deps;
   l('Found dependencies: ', @deps);
   return join(' ', @deps);
+}
+
+sub _fetch_target_label {
+  my $fn = 'cpanfile.cfg';
+  $fn = 'cpanfile' unless -r $fn;
+
+  l("Scan '$fn' for Dockerfile target label");
+  open(my $fh, $fn) or return '';
+
+  my $target;
+  while (<$fh>) {
+    $target = $1 if m/^\s*#*\s*target_label\s+(.+)$/i;
+  }
+
+  return '' unless $target;
+  l("Found target lavel: $target");
+  return $target;
 }
