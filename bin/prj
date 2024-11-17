@@ -142,40 +142,38 @@ sub deploy {
 
   ### rsync to each one
   info("Deploying project '$pname'");
-  foreach my $host (@hosts) {
-    $host = { %$ecfg, %$host };    ## Merge all configs!
-    fatal("Env '$env' with missing 'host'") unless $host->{host};
-
+  foreach my $hcfg (@hosts) {
     $hcfg = { host => $hcfg } unless ref($hcfg) eq 'HASH';
+    $hcfg = { %$ecfg, %$hcfg };                              ## Merge all configs!
+    fatal("Env '$env' with missing 'host'") unless my $host = $hcfg->{host};
+    fatal("Env '$env' with missing 'path'") unless my $path = $hcfg->{path};
 
     ## Skip it, something is wrong
-    if ($host->{skip}) {
-      info("Skipping host '$host->{host}', reason: $host->{skip}");
+    if ($hcfg->{skip}) {
+      info("Skipping host '$hcfg->{host}', reason: $hcfg->{skip}");
       next;
     }
 
-
     ## prepare post-deploy script
-    my $post_deploy_script = _create_post_deploy_script($host, $version, $env, @rest);
-
+    my $post_deploy_script = _create_post_deploy_script($hcfg, $version, $env, @rest);
 
     ## define our SSH command
     my @ssh_cmd = ('ssh', '-A');
 
     push @ssh_cmd, '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/ssh-controlmaster-%h-%p-%r', '-o',
       'ControlPersist=3600'
-      unless $host->{skip_ssh_control_master} or $ENV{PRJ_OPT_SKIP_SSH_CONTROL_MASTER};
+      unless $hcfg->{skip_ssh_control_master} or $ENV{PRJ_OPT_SKIP_SSH_CONTROL_MASTER};
 
     my $host_info = $host->{host};
-    if (my $user = $host->{user}) {
+    if (my $user = $hcfg->{user}) {
       push @ssh_cmd, '-l', $user;
       $host_info = "$user\@$host_info";
     }
-    if (my $port = $host->{port}) {
+    if (my $port = $hcfg->{port}) {
       push @ssh_cmd, '-p', $port;
       $host_info .= ":$port";
     }
-    if (my $key = $host->{key}) {
+    if (my $key = $hcfg->{key}) {
       push @ssh_cmd, '-i', _find_ssh_key($host_info, $key);
     }
     $host_info = "host '$host_info'";
@@ -184,8 +182,7 @@ sub deploy {
     ## Prepare and do the rsync
     my @cmd = (@$rsync, '-e', join(' ', @ssh_cmd));
 
-    my $path = $host->{path};
-    push @cmd, join(':', $host->{host}, $path);
+    push @cmd, "$host:$path";
     $host_info .= ", path '$path'";
     info(".... targetting $host_info");
     if ($opts{host} and $host_info !~ m/$opts{host}/) {
@@ -206,7 +203,7 @@ sub deploy {
       info("........ run post-deploy script");
       if   ($opts{verbose}) { push(@ssh_cmd, '-v') }
       else                  { push(@ssh_cmd, '-q') }
-      push @ssh_cmd, '-t', $host->{host}, "cd '$path' && ./$post_deploy_script '$env'";
+      push @ssh_cmd, '-t', $host, "cd '$path' && PRJ_ROOT='$path' PRJ_HOST='$host' ./$post_deploy_script '$env'";
 
       debug('Post deploy command:', \@ssh_cmd);
       unless ($opts{dryrun}) {
@@ -268,9 +265,17 @@ EOS
 
   $script .= "PRJ_ENV='$env'\nPRJ_DEPLOY_VERSION='$version'\n";
   $script .= "PRJ_USE_CURRENT='$version'\n" if $opts{current};
-  $script .= "PRJ_RESTART=1\n" if exists $opts{restart};
-  $script .= "PRJ_RESTART_FILTER='$opts{filter}'\n" if exists $opts{filter} and $opts{filter};
-  $script .= "export PRJ_ENV PRJ_DEPLOY_VERSION PRJ_USE_CURRENT PRJ_RESTART PRJ_RESTART_FILTER\n";
+  $script .= "PRJ_RESTART=1\n"              if exists $opts{restart};
+  $script .= "PRJ_RESTART_LOGS=1\n"         if exists $opts{logs};
+
+  if (exists $opts{filter} and $opts{filter}) {
+    my $filter = $opts{filter};
+    $filter = [$filter] unless ref($filter);
+    $filter = join('|', @$filter);
+    $script .= "PRJ_RESTART_FILTER='$filter'\n";
+  }
+
+  $script .= "export PRJ_ENV PRJ_DEPLOY_VERSION PRJ_USE_CURRENT PRJ_RESTART PRJ_RESTART_LOGS PRJ_RESTART_FILTER\n";
 
   if (my $aws_profile = $host->{aws_profile}) {
     my $k = _load_aws_credentials($aws_profile);
