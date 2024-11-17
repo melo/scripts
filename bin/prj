@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Data::Dump ();
+use Data::Dump   ();
 use Getopt::Long qw( :config require_order pass_through );
 use HTTP::Tiny;
 use JSON::MaybeXS;
@@ -17,7 +17,10 @@ my %opts = (
   current => 0,
 );
 
-my $ok = GetOptions(\%opts, "help", "verbose+", "quiet", "completion", "current", "dryrun|n", "restart", "stash", "filter=s", "host=s", "quick");
+my $ok = GetOptions(
+  \%opts,  "help",      "verbose+", "quiet", "completion", "current", "dryrun|n", "restart",
+  "stash", "filter=s@", "host=s",   "quick", "logs"
+);
 usage() unless $ok;
 usage() if $opts{help};
 usage() unless @ARGV;
@@ -57,7 +60,7 @@ sub dispatch_command {
 
 sub deploy {
   my ($pcfg, $env, @rest) = @_;
-  my $root = project_root();
+  my $root  = project_root();
   my $pname = $pcfg->{project}{name} || $root->basename;
 
   usage('Deploy requires an environment as parameter.',
@@ -332,13 +335,13 @@ EOS
       $script .= "perlbrew switch $pv\n";
     }
 
-    $script .= "fi\n"; ## else use perlbrew
+    $script .= "fi\n";    ## else use perlbrew
   }
 
   $script .= "cd '$host->{path}'\n\n";
 
   if (my $pv = $host->{perl_version}) {
-    $script .= 'if [ -n "$USE_PLENV" ] ; then' ."\n";
+    $script .= 'if [ -n "$USE_PLENV" ] ; then' . "\n";
     $script .= "  plenv local \"$host->{perl_version}\"\n";
     $script .= "fi\n";
   }
@@ -506,7 +509,7 @@ EOS
 EOS
 
       $lock = "consul lock";
-      $lock .= " -n $scfg->{lock_workers}" if $scfg->{lock_workers} and $scfg->{lock_workers} =~ m/^\d+$/;
+      $lock .= " -n $scfg->{lock_workers}"   if $scfg->{lock_workers} and $scfg->{lock_workers} =~ m/^\d+$/;
       $lock .= " -token $scfg->{lock_token}" if $scfg->{lock_token};
       $lock .= " '$ln'";
     }
@@ -839,15 +842,15 @@ sub _generate_rsync_command {
 
   ### Include excludes
   my $excl = $pcfg->{paths}{exclude} || [
-    ".git",                ## No need to send source control
-    "elib/*/.git",         ## No need to send source control
-    "elib/*/elib/*/.git",  ## No need to send source control
-    "supervise",           ## Supervise stuff
-    "main-*",              ## Supervise stuff
-    "local",               ## Perl deps
-    "node_modules",        ## Node deps
-    ".docker-perl-local",  ## Perl deps when using docker
-    ".vscode",             ## editor files
+    ".git",                  ## No need to send source control
+    "elib/*/.git",           ## No need to send source control
+    "elib/*/elib/*/.git",    ## No need to send source control
+    "supervise",             ## Supervise stuff
+    "main-*",                ## Supervise stuff
+    "local",                 ## Perl deps
+    "node_modules",          ## Node deps
+    ".docker-perl-local",    ## Perl deps when using docker
+    ".vscode",               ## editor files
 
   ];
   $excl = [$excl] unless ref($excl) eq 'ARRAY';
@@ -966,7 +969,7 @@ sub notify_hipchat {
       message        => "$args->{msg} (by $ENV{USER})",
       message_format => 'text',
       color          => $agent_cfg->{color} || 'purple',
-      notify => exists $agent_cfg->{notify_room} ? $agent_cfg->{notify_room} : 1,
+      notify         => exists $agent_cfg->{notify_room} ? $agent_cfg->{notify_room} : 1,
     }
   );
   debug("Notification hipchat: status is $res->{status}");
@@ -980,7 +983,7 @@ sub notify_hipchat {
 sub notify_loggly {
   my ($args, $agent_cfg) = @_;
 
-  my $tags = join(',', 'prjCodePush', @{ $agent_cfg->{tags} || [] });
+  my $tags  = join(',', 'prjCodePush', @{ $agent_cfg->{tags} || [] });
   my %clean = map { $_ => $args->{$_} } qw(workdir project_name msg env commit commit_message);
   $clean{timestamp} = Time::Moment->now_utc->to_string;
 
