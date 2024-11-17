@@ -143,6 +143,7 @@ sub deploy {
     $host = { %$ecfg, %$host };    ## Merge all configs!
     fatal("Env '$env' with missing 'host'") unless $host->{host};
 
+    $hcfg = { host => $hcfg } unless ref($hcfg) eq 'HASH';
 
     ## Skip it, something is wrong
     if ($host->{skip}) {
@@ -882,13 +883,50 @@ sub notify {
 
   $ncfg = [$ncfg] unless ref($ncfg) eq 'ARRAY';
   for my $agent (@$ncfg) {
-    if ($agent->{type} eq 'loggly') { notify_loggly($args, $agent) }
-    elsif ($agent->{type} eq 'hipchat') { notify_hipchat($args, $agent) }
-    elsif ($agent->{type} eq 'growl') { notify_growl($args, $agent) }
-    elsif ($agent->{type} eq 'osx') { notify_osx($args, $agent) }
+    if    ($agent->{type} eq 'loggly')      { notify_loggly($args, $agent) }
+    elsif ($agent->{type} eq 'hipchat')     { notify_hipchat($args, $agent) }
+    elsif ($agent->{type} eq 'growl')       { notify_growl($args, $agent) }
+    elsif ($agent->{type} eq 'osx')         { notify_osx($args, $agent) }
+    elsif ($agent->{type} eq 'honeybadger') { notify_honebadger($args, $agent) }
   }
 
   return;
+}
+
+sub notify_honebadger {
+  my ($args)    = @_;
+  my ($api_key) = do {
+    my ($line) = eval { path("$ENV{HOME}/.honeybadger")->lines };
+    chomp($line);
+    $line;
+  };
+  return error('failed to obtain HoneyBadger API key') unless $api_key;
+
+  my $req = {
+    environment    => $args->{env},
+    local_username => (getpwuid($<))[0],
+    revision       => $args->{commit},
+    repository     => $args->{workdir},
+  };
+  my $res = _ua()->post(
+    'https://api.honeybadger.io/v1/deploys' => {
+      headers => {
+        'X-API-Key'    => $api_key,
+        'Content-Type' => 'application/json',
+        'Accept'       => 'application/json',
+      },
+      content => encode_json($req),
+    }
+  );
+
+  if ($res->{status} == 201) {
+    my $answer = eval { decode_json($res->{content}) };
+    if ($answer and $answer->{status} eq 'OK') {
+      info('Notification sent to HoneyBadger');
+      return;
+    }
+  }
+  return error("Failed to notify honeybadgers: $res->{status}");
 }
 
 sub notify_osx {
