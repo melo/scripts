@@ -1098,7 +1098,7 @@ sub _has_cmd {
   my ($cmd) = @_;
 
   for my $path (split(/:/, $ENV{PATH})) {
-    my $fn = catfile($path, $cmd);
+    my $fn = join('/', $path, $cmd);
     return $fn if -x $fn;
   }
 
