@@ -1,3 +1,6 @@
 [submodule "ext/zsh-bit-prompt"]
 	path = ext/zsh-bit-prompt
 	url = https://github.com/olivierverdier/zsh-git-prompt.git
+[submodule "elib/meeko"]
+	path = elib/meeko
+	url = git@git.worten.net:pocahontas/meeko.git
